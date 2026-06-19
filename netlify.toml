@@ -1,0 +1,10 @@
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/mlb"
+  to = "/.netlify/functions/mlb"
+  status = 200

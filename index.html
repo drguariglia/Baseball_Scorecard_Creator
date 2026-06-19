@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guariglia Baseball Scorecard Builder</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-brand">
+      <div class="brand-mark-wrap">
+        <img class="brand-mark" src="assets/guariglia-crest.gif" alt="Guariglia company crest logo" />
+      </div>
+      <div class="hero-content">
+        <p class="eyebrow">Guariglia company app • print-ready baseball scorecards</p>
+        <h1>Guariglia Baseball Scorecard Builder</h1>
+        <p class="subtitle">Choose an MLB or MiLB game for today or a future date, or enter every detail yourself. Review the information, then download the scorecard as Excel or as a one-page PDF.</p>
+      </div>
+    </div>
+    <div class="hero-actions">
+      <button id="downloadBlankBtn" type="button" class="secondary">Download Blank Scorecard</button>
+      <button id="exportExcelBtn" type="button" class="secondary">Download Excel</button>
+      <button id="exportPdfBtn" type="button" class="primary">Download PDF</button>
+    </div>
+  </header>
+
+  <main class="app-shell">
+
+    <section id="start" class="panel active form-panel start-panel">
+      <div class="panel-title-row">
+        <div>
+          <p class="section-kicker">Choose a method</p>
+          <h2>How would you like to build this scorecard?</h2>
+          <p>Use official online game information for an MLB or MiLB matchup, or open a completely blank form for manual entry. The app is now branded with the Guariglia company crest.</p>
+        </div>
+      </div>
+
+      <div class="mode-grid">
+        <div class="entry-card lookup-card">
+          <div class="mode-heading">
+            <span class="mode-icon" aria-hidden="true">↗</span>
+            <div>
+              <h3>Choose a current or future game</h3>
+              <p class="card-help">Choose a date and baseball level, then select one scheduled matchup. Every available scorecard field will be filled automatically.</p>
+            </div>
+          </div>
+
+          <div class="schedule-date-row">
+            <label>Game date <span class="optional-label">today or later</span>
+              <input id="lookupDate" type="date" />
+            </label>
+            <label>League / level
+              <select id="scheduleLevel">
+                <option value="mlb">MLB</option>
+                <option value="all-pro">MLB + All MiLB</option>
+                <option value="all-milb">All MiLB</option>
+                <option value="triple-a">Triple-A</option>
+                <option value="double-a">Double-A</option>
+                <option value="high-a">High-A</option>
+                <option value="single-a">Single-A</option>
+                <option value="rookie">Rookie</option>
+              </select>
+            </label>
+            <button id="refreshGamesBtn" type="button" class="secondary">Refresh Schedule</button>
+          </div>
+
+          <label class="game-select-label">Scheduled games
+            <select id="dailyGameSelect" disabled>
+              <option value="">Loading today’s MLB games…</option>
+            </select>
+          </label>
+
+          <button id="lookupGameBtn" type="button" class="primary full-width" disabled>Fill Scorecard from Selected Game</button>
+          <div id="lookupStatus" class="lookup-status" role="status">Loading today’s official MLB schedule…</div>
+          <p class="source-note">Choose today or any future date. Starting lineups, probable pitchers, umpires, weather, and broadcasts appear only after those details have been published. MiLB data availability varies by level and ballpark. Imported information can always be edited.</p>
+        </div>
+
+        <div class="entry-card manual-card">
+          <div class="mode-heading">
+            <span class="mode-icon manual-icon" aria-hidden="true">✎</span>
+            <div>
+              <h3>Enter everything manually</h3>
+              <p class="card-help">Open the existing blank form and type teams, game information, lineups, pitchers, broadcasts, and notes yourself.</p>
+            </div>
+          </div>
+          <div class="manual-summary">
+            <strong>Best for:</strong>
+            <p>College, high school, youth, historic, exhibition, or custom games—and whenever you prefer complete control.</p>
+          </div>
+          <button id="manualEntryBtn" type="button" class="secondary full-width">Open Blank Manual Form</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="quick-start panel notice-panel" aria-label="How this app works">
+      <div class="quick-start-card">
+        <span class="step-dot">1</span>
+        <div>
+          <h2>Choose a scheduled game or manual entry</h2>
+          <p>Select an MLB or MiLB game by date and level, or begin with a blank form.</p>
+        </div>
+      </div>
+      <div class="quick-start-card">
+        <span class="step-dot">2</span>
+        <div>
+          <h2>Review and edit</h2>
+          <p>Check all imported information and add anything not yet available.</p>
+        </div>
+      </div>
+      <div class="quick-start-card">
+        <span class="step-dot">3</span>
+        <div>
+          <h2>Download Excel or PDF</h2>
+          <p>The PDF is sized to one 8.5 × 11 sheet with quarter-inch margins.</p>
+        </div>
+      </div>
+    </section>
+
+    <nav class="step-nav" aria-label="Scorecard sections">
+      <button class="step active" data-step="start" type="button"><span>1</span> Start</button>
+      <button class="step" data-step="game" type="button"><span>2</span> Game</button>
+      <button class="step" data-step="lineups" type="button"><span>3</span> Lineups</button>
+      <button class="step" data-step="pitching" type="button"><span>4</span> Pitching</button>
+      <button class="step" data-step="notes" type="button"><span>5</span> Notes & Download</button>
+      <button class="step" data-step="template" type="button"><span>6</span> Settings</button>
+    </nav>
+
+    <section id="game" class="panel form-panel">
+      <div class="panel-title-row">
+        <div>
+          <p class="section-kicker">Step 2</p>
+          <h2>Game Information</h2>
+          <p>These fields appear in the top section of the finished scorecard.</p>
+        </div>
+        <button class="nextBtn primary" data-next="lineups" type="button">Next: Lineups</button>
+      </div>
+
+      <div id="importBanner" class="import-banner" hidden>
+        <strong id="importBannerTitle">Online game information loaded</strong>
+        <span id="importBannerText">Review every field before creating the scorecard.</span>
+      </div>
+
+      <div class="form-grid two-col">
+        <label>Away Team
+          <input id="awayTeam" type="text" placeholder="Away team" autocomplete="off" />
+        </label>
+        <label>Home Team
+          <input id="homeTeam" type="text" placeholder="Home team" autocomplete="off" />
+        </label>
+        <label>Away Record
+          <input id="awayRecord" type="text" placeholder="Optional" autocomplete="off" />
+        </label>
+        <label>Home Record
+          <input id="homeRecord" type="text" placeholder="Optional" autocomplete="off" />
+        </label>
+        <label>Date
+          <input id="gameDate" type="date" />
+        </label>
+        <label>Time
+          <input id="gameTime" type="text" placeholder="Game time" autocomplete="off" />
+        </label>
+        <label>Venue
+          <input id="venue" type="text" placeholder="Ballpark / field" autocomplete="off" />
+        </label>
+        <label>Game Number
+          <input id="gameNumber" type="text" placeholder="Optional" autocomplete="off" />
+        </label>
+        <label>Weather
+          <input id="weather" type="text" placeholder="Temperature, conditions, wind" autocomplete="off" />
+        </label>
+        <label>Umpires
+          <input id="umpires" type="text" placeholder="Plate, first, second, third" autocomplete="off" />
+        </label>
+        <label>TV / Broadcast
+          <input id="broadcast" type="text" placeholder="TV / streaming" autocomplete="off" />
+        </label>
+        <label>Radio / Listen
+          <input id="radio" type="text" placeholder="Radio / audio" autocomplete="off" />
+        </label>
+      </div>
+    </section>
+
+    <section id="lineups" class="panel form-panel">
+      <div class="panel-title-row">
+        <div>
+          <p class="section-kicker">Step 3</p>
+          <h2>Lineups</h2>
+          <p>Enter the batting order. Leave unused fields blank.</p>
+        </div>
+        <div class="button-row">
+          <button class="nextBtn ghost" data-next="game" type="button">Back</button>
+          <button class="nextBtn primary" data-next="pitching" type="button">Next: Pitching</button>
+        </div>
+      </div>
+      <div class="lineup-input-wrap">
+        <div class="entry-card">
+          <h3>Away Lineup</h3>
+          <p class="card-help">Nine batting-order rows are available.</p>
+          <div id="awayLineupInputs" class="lineup-inputs"></div>
+        </div>
+        <div class="entry-card">
+          <h3>Home Lineup</h3>
+          <p class="card-help">Nine batting-order rows are available.</p>
+          <div id="homeLineupInputs" class="lineup-inputs"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="pitching" class="panel form-panel">
+      <div class="panel-title-row">
+        <div>
+          <p class="section-kicker">Step 4</p>
+          <h2>Pitching</h2>
+          <p>Add the starting pitchers and any expected bullpen rows.</p>
+        </div>
+        <div class="button-row">
+          <button class="nextBtn ghost" data-next="lineups" type="button">Back</button>
+          <button class="nextBtn primary" data-next="notes" type="button">Next: Notes</button>
+        </div>
+      </div>
+      <div class="lineup-input-wrap">
+        <div class="entry-card">
+          <h3>Away Pitchers</h3>
+          <p class="card-help">Six pitcher rows are available.</p>
+          <div id="awayPitcherInputs" class="pitcher-inputs"></div>
+        </div>
+        <div class="entry-card">
+          <h3>Home Pitchers</h3>
+          <p class="card-help">Six pitcher rows are available.</p>
+          <div id="homePitcherInputs" class="pitcher-inputs"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="notes" class="panel form-panel">
+      <div class="panel-title-row">
+        <div>
+          <p class="section-kicker">Step 5</p>
+          <h2>Notes & Download</h2>
+          <p>Add any game notes, then download the finished scorecard as Excel or PDF.</p>
+        </div>
+        <div class="button-row">
+          <button class="nextBtn ghost" data-next="pitching" type="button">Back</button>
+          <button id="saveDraftBtn" type="button" class="secondary">Save Draft</button>
+          <button id="loadDraftBtn" type="button" class="secondary">Load Draft</button>
+          <button id="clearBtn" type="button" class="danger">Clear Form</button>
+          <button id="exportExcelBtn2" type="button" class="secondary">Download Excel</button>
+          <button id="exportPdfBtn2" type="button" class="primary">Download PDF</button>
+        </div>
+      </div>
+      <label>Game Notes
+        <textarea id="gameNotes" rows="7" placeholder="Lineup changes, substitutions, milestones, scoring reminders, or weather updates" autocomplete="off"></textarea>
+      </label>
+      <div class="status-box" id="statusBox">Ready. Fill in the form, then download Excel or a one-page PDF.</div>
+    </section>
+
+    <section id="template" class="panel form-panel">
+      <div class="panel-title-row">
+        <div>
+          <p class="section-kicker">Optional</p>
+          <h2>Scorecard Settings</h2>
+          <p>Use the built-in scorecard, or upload a newer blank scorecard later.</p>
+        </div>
+        <div class="button-row">
+          <button class="nextBtn ghost" data-next="notes" type="button">Back</button>
+          <button id="validateTemplateBtn" type="button" class="secondary">Check Scorecard</button>
+        </div>
+      </div>
+      <div class="template-grid">
+        <div class="entry-card">
+          <h3>Blank scorecard</h3>
+          <p class="card-help">Download a clean blank copy anytime.</p>
+          <button id="downloadBlankBtn2" type="button" class="secondary full-width">Download Blank Scorecard</button>
+        </div>
+        <div class="entry-card">
+          <h3>Use a newer blank scorecard</h3>
+          <label>Upload blank scorecard
+            <input id="templateFile" type="file" accept=".xlsx,.xlsm" />
+          </label>
+          <p id="templateStatus" class="card-help">Using the built-in blank scorecard.</p>
+        </div>
+      </div>
+      <details class="advanced-log">
+        <summary>Advanced export log</summary>
+        <pre id="exportLog">Ready.</pre>
+      </details>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-brand">
+      <img class="footer-mark" src="assets/guariglia-crest.gif" alt="Guariglia company crest logo" />
+      <div>
+        <strong>Guariglia</strong>
+        <p>Company crest branding is now built into this Baseball Scorecard Builder while preserving all Version 9 functionality.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="vendor/jszip.min.js"></script>
+  <script src="template_data.js"></script>
+  <script src="pdf_background_data.js"></script>
+  <script src="mlb_data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
