@@ -1,0 +1,13 @@
+{
+  "name": "guariglia-baseball-scorecard-builder-v21",
+  "version": "21.0.0",
+  "private": true,
+  "description": "Guariglia Baseball Scorecard Builder Version 21 with pitch-by-pitch ball/strike counting, phone and keyboard controls, quick result codes, classic scorecard exports, and schedule lookup",
+  "devDependencies": {
+    "@netlify/functions": "latest"
+  },
+  "scripts": {
+    "test": "node tests/baseball-data.test.js && node tests/index-connection.test.js && node tests/startup-reset.test.js && node tests/refresh-section.test.js && node tests/responsive-layout.test.js && node tests/pitch-count.test.js",
+    "check:js": "node --check app.js && node --check baseball-data.js && node --check service-worker.js"
+  }
+}

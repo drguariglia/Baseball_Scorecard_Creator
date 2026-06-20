@@ -1,1172 +1,723 @@
 const LINEUP_ROWS = 9;
 const PITCHER_ROWS = 6;
-
+const PA_SLOTS = 10;
+const LEGACY_STORAGE_PREFIXES = ["guariglia-scorecard", "scorecard20260615"];
 const TEMPLATE_FILE_NAME = "Scorecard_20260615_blank_template.xlsx";
-const DEFAULT_TEMPLATE_LABEL = "built-in blank scorecard";
+
+const OUTCOMES = [
+  {id:"1B", label:"Single", code:"1B", hit:1, bases:1, ab:true},
+  {id:"2B", label:"Double", code:"2B", hit:1, bases:2, ab:true},
+  {id:"3B", label:"Triple", code:"3B", hit:1, bases:3, ab:true},
+  {id:"HR", label:"Home Run", code:"HR", hit:1, bases:4, ab:true, hr:1},
+  {id:"BB", label:"Walk", code:"BB", bb:1, ab:false},
+  {id:"IBB", label:"Intentional Walk", code:"IBB", bb:1, ab:false},
+  {id:"HBP", label:"Hit by Pitch", code:"HBP", ab:false},
+  {id:"ROE", label:"Reached on Error", code:"E", ab:true},
+  {id:"FC", label:"Fielder’s Choice", code:"FC", ab:true},
+  {id:"CI", label:"Catcher Interference", code:"CI", ab:false},
+  {id:"D3K", label:"Dropped Third Strike / Reached", code:"K+", k:1, ab:true},
+  {id:"K", label:"Strikeout Swinging", code:"K", k:1, ab:true, out:true},
+  {id:"KL", label:"Strikeout Looking", code:"ꓘ", k:1, ab:true, out:true},
+  {id:"GO", label:"Groundout", code:"GO", ab:true, out:true},
+  {id:"FO", label:"Flyout", code:"FO", ab:true, out:true},
+  {id:"LO", label:"Lineout", code:"LO", ab:true, out:true},
+  {id:"PO", label:"Popout", code:"PO", ab:true, out:true},
+  {id:"SF", label:"Sacrifice Fly", code:"SF", ab:false, out:true},
+  {id:"SH", label:"Sacrifice Bunt", code:"SAC", ab:false, out:true},
+  {id:"DP", label:"Double Play", code:"DP", ab:true, out:true},
+  {id:"TP", label:"Triple Play", code:"TP", ab:true, out:true},
+  {id:"OBS", label:"Reached on Obstruction", code:"OBS", ab:false},
+  {id:"OTHER", label:"Other / Custom Play", code:"OTH", ab:false}
+];
+const OUTCOME_MAP = Object.fromEntries(OUTCOMES.map(o => [o.id, o]));
+const QUICK_RESULTS = [
+  ["1B","Single"],["2B","Double"],["3B","Triple"],["HR","Home Run"],
+  ["BB","Walk"],["HBP","Hit by Pitch"],["K","Strikeout"],["KL","Looking K"],
+  ["GO","Groundout"],["FO","Flyout"],["LO","Lineout"],["PO","Popout"],
+  ["ROE","Error"],["FC","Fielder’s Choice"],["SF","Sac Fly"],["SH","Sac Bunt"],
+  ["DP","Double Play"],["IBB","Intentional Walk"],["OTHER","Other / Details"]
+];
+const DESTINATIONS = [
+  ["empty","No runner"], ["hold","Stayed"], ["1","First base"], ["2","Second base"], ["3","Third base"], ["home","Scored"], ["out","Out"]
+];
+const BATTER_DESTINATIONS = [["out","Out"],["1","First base"],["2","Second base"],["3","Third base"],["home","Home / scored"]];
+const $ = id => document.getElementById(id);
+const deepClone = obj => JSON.parse(JSON.stringify(obj));
+const makeId = () => globalThis.crypto?.randomUUID?.() || `play-${Date.now()}-${Math.random().toString(36).slice(2,10)}`;
+const num = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+const sum = values => values.reduce((a,b)=>a+num(b),0);
+const escapeHtml = value => String(value ?? "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+
 let uploadedTemplateBuffer = null;
 let uploadedTemplateName = "";
+let scheduleGames = [];
 let scheduleRequestToken = 0;
+let autosaveTimer = null;
+let deferredInstallPrompt = null;
 
-const $ = (id) => document.getElementById(id);
+function emptyBases(){ return {1:null,2:null,3:null}; }
+function initialCount(){ return {balls:0,strikes:0,pitches:0,history:[],pendingStrikeout:false,inPlay:false}; }
+function normalizeCount(value={}){
+  const count=initialCount();
+  count.balls=Math.max(0,Math.min(4,num(value.balls)));
+  count.strikes=Math.max(0,Math.min(3,num(value.strikes)));
+  count.pitches=Math.max(0,num(value.pitches));
+  count.history=Array.isArray(value.history)?value.history.map(item=>String(item)):[];
+  count.pendingStrikeout=Boolean(value.pendingStrikeout);
+  count.inPlay=Boolean(value.inPlay);
+  return count;
+}
+function initialScoring(){
+  return {inning:1,half:"top",outs:0,bases:emptyBases(),battingIndexes:{away:0,home:0},plays:[],nextSeq:1,count:initialCount()};
+}
+function ensureScoringState(){
+  if(!scoring||typeof scoring!=="object")scoring=initialScoring();
+  scoring.count=normalizeCount(scoring.count||{});
+  scoring.bases=scoring.bases||emptyBases();
+  scoring.battingIndexes=scoring.battingIndexes||{away:0,home:0};
+  scoring.plays=Array.isArray(scoring.plays)?scoring.plays:[];
+}
+let scoring = initialScoring();
 
-// IMPORTANT: These are the visible cells in the real Scorecard_20260615 template.
-// The browser form does not redraw the scorecard; it only writes values into these cells.
-const TEMPLATE_MAP = {
-  sheet: "Scorecard",
-  cells: {
-    topLine: "A2",
-    weatherBroadcastBlock: "A3",
-    replayTitle: "J3",
-    awayReplay: "J4",
-    homeReplay: "M4",
-    awayScoreLabel: "A6",
-    homeScoreLabel: "A7",
-    awayLineupTitle: "A9",
-    homeLineupTitle: "A21",
-    awayPitchingTitle: "A33",
-    homePitchingTitle: "A41",
-    gameNotesBlock: "J33"
-  },
-  lists: {
-    awayLineup: { start: "A11", rows: 9 },
-    homeLineup: { start: "A23", rows: 9 },
-    awayPitchers: { start: "A35", rows: 6 },
-    homePitchers: { start: "A43", rows: 6 }
-  }
-};
-
-const XML_MAIN_NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const XML_REL_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const XML_PACKAGE_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships";
-const XML_SPACE_NS = "http://www.w3.org/XML/1998/namespace";
-
-function createLineupInputs(team) {
-  const wrap = $(`${team}LineupInputs`);
-  wrap.innerHTML = "";
-  const caption = document.createElement("div");
-  caption.className = "input-caption";
-  caption.textContent = "# / Name / Pos / Bats / AVG / OBP";
-  wrap.appendChild(caption);
-  for (let i = 1; i <= LINEUP_ROWS; i++) {
-    const row = document.createElement("div");
-    row.className = "lineup-row";
-    row.innerHTML = `
-      <span class="row-number">${i}</span>
-      <input id="${team}Num${i}" type="text" placeholder="#" autocomplete="off" />
-      <input id="${team}Player${i}" type="text" placeholder="Player name" autocomplete="off" />
-      <input id="${team}Pos${i}" type="text" placeholder="Pos" autocomplete="off" />
-      <input id="${team}Bats${i}" type="text" placeholder="Bats" autocomplete="off" />
-      <input id="${team}Avg${i}" type="text" placeholder="AVG" autocomplete="off" />
-      <input id="${team}Obp${i}" type="text" placeholder="OBP" autocomplete="off" />
-    `;
+function createLineupInputs(team){
+  const wrap = $(`${team}LineupInputs`); wrap.innerHTML="";
+  const caption=document.createElement("div"); caption.className="input-caption"; caption.textContent="# / Name / Pos / Bats / AVG / OBP"; wrap.appendChild(caption);
+  for(let i=1;i<=LINEUP_ROWS;i++){
+    const row=document.createElement("div"); row.className="lineup-row responsive-entry-row";
+    row.innerHTML=`
+      <span class="row-number" aria-label="Batting order ${i}">${i}</span>
+      <label class="mini-field number-field"><span>No.</span><input id="${team}Num${i}" placeholder="#" aria-label="${team} player ${i} number" autocomplete="off"></label>
+      <label class="mini-field name-field"><span>Player name</span><input id="${team}Player${i}" placeholder="Player name" aria-label="${team} player ${i} name" autocomplete="off"></label>
+      <label class="mini-field"><span>Position</span><input id="${team}Pos${i}" placeholder="Pos" aria-label="${team} player ${i} position" autocomplete="off"></label>
+      <label class="mini-field"><span>Bats</span><input id="${team}Bats${i}" placeholder="Bats" aria-label="${team} player ${i} bats" autocomplete="off"></label>
+      <label class="mini-field"><span>AVG</span><input id="${team}Avg${i}" placeholder="AVG" aria-label="${team} player ${i} average" autocomplete="off"></label>
+      <label class="mini-field"><span>OBP</span><input id="${team}Obp${i}" placeholder="OBP" aria-label="${team} player ${i} on base percentage" autocomplete="off"></label>`;
     wrap.appendChild(row);
   }
 }
-
-function createPitcherInputs(team) {
-  const wrap = $(`${team}PitcherInputs`);
-  wrap.innerHTML = "";
-  const caption = document.createElement("div");
-  caption.className = "input-caption";
-  caption.textContent = "# / Name / Throws / Record / ERA / K";
-  wrap.appendChild(caption);
-  for (let i = 1; i <= PITCHER_ROWS; i++) {
-    const row = document.createElement("div");
-    row.className = "pitcher-row";
-    row.innerHTML = `
-      <span class="row-number">${i}</span>
-      <input id="${team}PitcherNum${i}" type="text" placeholder="#" autocomplete="off" />
-      <input id="${team}Pitcher${i}" type="text" placeholder="Pitcher name" autocomplete="off" />
-      <input id="${team}PitcherThrows${i}" type="text" placeholder="Throws" autocomplete="off" />
-      <input id="${team}PitcherRecord${i}" type="text" placeholder="Record" autocomplete="off" />
-      <input id="${team}PitcherEra${i}" type="text" placeholder="ERA" autocomplete="off" />
-      <input id="${team}PitcherK${i}" type="text" placeholder="K" autocomplete="off" />
-    `;
+function createPitcherInputs(team){
+  const wrap=$(`${team}PitcherInputs`); wrap.innerHTML="";
+  const caption=document.createElement("div"); caption.className="input-caption"; caption.textContent="# / Name / Throws / Record / ERA / K"; wrap.appendChild(caption);
+  for(let i=1;i<=PITCHER_ROWS;i++){
+    const row=document.createElement("div"); row.className="pitcher-row responsive-entry-row";
+    row.innerHTML=`
+      <span class="row-number" aria-label="Pitcher row ${i}">${i}</span>
+      <label class="mini-field number-field"><span>No.</span><input id="${team}PitcherNum${i}" placeholder="#" aria-label="${team} pitcher ${i} number" autocomplete="off"></label>
+      <label class="mini-field name-field"><span>Pitcher name</span><input id="${team}Pitcher${i}" placeholder="Pitcher name" aria-label="${team} pitcher ${i} name" autocomplete="off"></label>
+      <label class="mini-field"><span>Throws</span><input id="${team}PitcherThrows${i}" placeholder="Throws" aria-label="${team} pitcher ${i} throws" autocomplete="off"></label>
+      <label class="mini-field"><span>Record</span><input id="${team}PitcherRecord${i}" placeholder="Record" aria-label="${team} pitcher ${i} record" autocomplete="off"></label>
+      <label class="mini-field"><span>ERA</span><input id="${team}PitcherEra${i}" placeholder="ERA" aria-label="${team} pitcher ${i} ERA" autocomplete="off"></label>
+      <label class="mini-field"><span>K</span><input id="${team}PitcherK${i}" placeholder="K" aria-label="${team} pitcher ${i} strikeouts" autocomplete="off"></label>`;
     wrap.appendChild(row);
   }
 }
-
-function getField(id) {
-  return $(id)?.value?.trim() || "";
+function getField(id){ return $(id)?.value?.trim() || ""; }
+function setField(id,value){ if($(id)) $(id).value=value ?? ""; }
+function collectTeam(team){
+  const lineup=[]; const pitchers=[];
+  for(let i=1;i<=LINEUP_ROWS;i++) lineup.push({num:getField(`${team}Num${i}`),name:getField(`${team}Player${i}`),pos:getField(`${team}Pos${i}`),bats:getField(`${team}Bats${i}`),avg:getField(`${team}Avg${i}`),obp:getField(`${team}Obp${i}`)});
+  for(let i=1;i<=PITCHER_ROWS;i++) pitchers.push({num:getField(`${team}PitcherNum${i}`),name:getField(`${team}Pitcher${i}`),throws:getField(`${team}PitcherThrows${i}`),record:getField(`${team}PitcherRecord${i}`),era:getField(`${team}PitcherEra${i}`),k:getField(`${team}PitcherK${i}`)});
+  return {lineup,pitchers};
 }
-
-function setField(id, value) {
-  if ($(id)) $(id).value = value || "";
+function collectData(){
+  return {awayTeam:getField("awayTeam"),homeTeam:getField("homeTeam"),awayRecord:getField("awayRecord"),homeRecord:getField("homeRecord"),gameDate:getField("gameDate"),gameTime:getField("gameTime"),venue:getField("venue"),gameNumber:getField("gameNumber"),weather:getField("weather"),umpires:getField("umpires"),broadcast:getField("broadcast"),radio:getField("radio"),gameNotes:getField("gameNotes"),away:collectTeam("away"),home:collectTeam("home")};
 }
-
-function collectTeam(team) {
-  const lineup = [];
-  for (let i = 1; i <= LINEUP_ROWS; i++) {
-    lineup.push({
-      num: getField(`${team}Num${i}`),
-      name: getField(`${team}Player${i}`),
-      pos: getField(`${team}Pos${i}`),
-      bats: getField(`${team}Bats${i}`),
-      avg: getField(`${team}Avg${i}`),
-      obp: getField(`${team}Obp${i}`)
-    });
-  }
-  const pitchers = [];
-  for (let i = 1; i <= PITCHER_ROWS; i++) {
-    pitchers.push({
-      num: getField(`${team}PitcherNum${i}`),
-      name: getField(`${team}Pitcher${i}`),
-      throws: getField(`${team}PitcherThrows${i}`),
-      record: getField(`${team}PitcherRecord${i}`),
-      era: getField(`${team}PitcherEra${i}`),
-      k: getField(`${team}PitcherK${i}`)
-    });
-  }
-  return { lineup, pitchers };
-}
-
-function collectData() {
-  return {
-    awayTeam: getField("awayTeam"),
-    homeTeam: getField("homeTeam"),
-    awayRecord: getField("awayRecord"),
-    homeRecord: getField("homeRecord"),
-    gameDate: getField("gameDate"),
-    gameDateFormatted: formatDate(getField("gameDate")),
-    gameTime: getField("gameTime"),
-    venue: getField("venue"),
-    gameNumber: getField("gameNumber"),
-    weather: getField("weather"),
-    umpires: getField("umpires"),
-    broadcast: getField("broadcast"),
-    radio: getField("radio"),
-    gameNotes: getField("gameNotes"),
-    away: collectTeam("away"),
-    home: collectTeam("home")
-  };
-}
-
-function setFieldsFromData(data) {
-  [
-    "awayTeam", "homeTeam", "awayRecord", "homeRecord", "gameDate", "gameTime", "venue",
-    "gameNumber", "weather", "umpires", "broadcast", "radio", "gameNotes"
-  ].forEach((id) => setField(id, data[id] || ""));
-
-  ["away", "home"].forEach((team) => {
-    const teamData = data[team] || {};
-    for (let index = 0; index < LINEUP_ROWS; index++) {
-      const player = (teamData.lineup || [])[index] || {};
-      const i = index + 1;
-      setField(`${team}Num${i}`, player.num);
-      setField(`${team}Player${i}`, player.name);
-      setField(`${team}Pos${i}`, player.pos);
-      setField(`${team}Bats${i}`, player.bats);
-      setField(`${team}Avg${i}`, player.avg);
-      setField(`${team}Obp${i}`, player.obp);
-    }
-    for (let index = 0; index < PITCHER_ROWS; index++) {
-      const pitcher = (teamData.pitchers || [])[index] || {};
-      const i = index + 1;
-      setField(`${team}PitcherNum${i}`, pitcher.num);
-      setField(`${team}Pitcher${i}`, pitcher.name);
-      setField(`${team}PitcherThrows${i}`, pitcher.throws);
-      setField(`${team}PitcherRecord${i}`, pitcher.record);
-      setField(`${team}PitcherEra${i}`, pitcher.era);
-      setField(`${team}PitcherK${i}`, pitcher.k);
-    }
+function setFieldsFromData(data={}){
+  ["awayTeam","homeTeam","awayRecord","homeRecord","gameDate","gameTime","venue","gameNumber","weather","umpires","broadcast","radio","gameNotes"].forEach(id=>setField(id,data[id]||""));
+  ["away","home"].forEach(team=>{
+    const t=data[team]||{};
+    for(let x=0;x<LINEUP_ROWS;x++){const p=(t.lineup||[])[x]||{},i=x+1;setField(`${team}Num${i}`,p.num);setField(`${team}Player${i}`,p.name);setField(`${team}Pos${i}`,p.pos);setField(`${team}Bats${i}`,p.bats);setField(`${team}Avg${i}`,p.avg);setField(`${team}Obp${i}`,p.obp);}
+    for(let x=0;x<PITCHER_ROWS;x++){const p=(t.pitchers||[])[x]||{},i=x+1;setField(`${team}PitcherNum${i}`,p.num);setField(`${team}Pitcher${i}`,p.name);setField(`${team}PitcherThrows${i}`,p.throws);setField(`${team}PitcherRecord${i}`,p.record);setField(`${team}PitcherEra${i}`,p.era);setField(`${team}PitcherK${i}`,p.k);}
   });
+  refreshAll();
 }
-
-function formatDate(value) {
-  if (!value) return "";
-  const parts = value.split("-");
-  if (parts.length !== 3) return value;
-  return `${parts[1]}/${parts[2]}/${parts[0]}`;
+function formatPlayer(player,index){
+  const name=player.name||`Batter ${index+1}`; const detail=[player.num?`#${String(player.num).replace(/^#/,"")}`:"",player.pos,player.bats].filter(Boolean).join(" • ");
+  return {name,detail};
 }
-
-function withRecord(team, record) {
-  if (!team && !record) return "";
-  if (!record) return team;
-  if (!team) return record;
-  return `${team} (${record})`;
+function formatLineupPlayer(p){
+  const left=[p.num?`#${String(p.num).replace(/^#/,"")}`:"",p.name].filter(Boolean).join(" ");
+  const details=[p.pos,p.bats,[p.avg,p.obp].filter(Boolean).join("/")].filter(Boolean);
+  return [left,...details].filter(Boolean).join(" — ");
 }
-
-function appendIf(arr, value) {
-  if (value) arr.push(value);
+function formatPitcher(p){
+  const left=[p.num?`#${String(p.num).replace(/^#/,"")}`:"",p.name].filter(Boolean).join(" ");
+  const details=[p.throws,p.record,p.era?`${String(p.era).replace(/\s*ERA$/i,"")} ERA`:"",p.k?`${String(p.k).replace(/\s*K$/i,"")} K`:""].filter(Boolean);
+  return [left,...details].filter(Boolean).join(" — ");
 }
-
-function makeTopLine(data) {
-  const pieces = [];
-  const matchup = data.awayTeam || data.homeTeam ? `${data.awayTeam || "Away"} at ${data.homeTeam || "Home"}` : "";
-  appendIf(pieces, matchup);
-  appendIf(pieces, data.gameDateFormatted);
-  appendIf(pieces, data.gameTime);
-  appendIf(pieces, data.venue);
-  const records = [data.awayRecord, data.homeRecord].filter(Boolean).join(" / ");
-  appendIf(pieces, records);
-  appendIf(pieces, data.gameNumber);
-  return pieces.join(" • ");
+function setPanel(id){
+  document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id===id));
+  document.querySelectorAll(".step").forEach(b=>b.classList.toggle("active",b.dataset.panel===id));
+  if(id==="summary") renderSummary();
+  if(id==="scoring") renderScoring();
+  window.scrollTo({top:0,behavior:"smooth"});
 }
-
-function makeWeatherBroadcastBlock(data) {
-  const lines = [];
-  const weatherPieces = [];
-  if (data.weather) weatherPieces.push(`Weather: ${data.weather}`);
-  if (data.umpires) weatherPieces.push(`Umpires: ${data.umpires}`);
-  if (weatherPieces.length) lines.push(weatherPieces.join(" • "));
-
-  const broadcastPieces = [];
-  if (data.broadcast) broadcastPieces.push(`TV: ${data.broadcast}`);
-  if (data.radio) broadcastPieces.push(`Radio: ${data.radio}`);
-  if (broadcastPieces.length) lines.push(broadcastPieces.join(" • "));
-
-  return lines.join("\n");
+function teamName(team){ const d=collectData(); return d[`${team}Team`] || (team==="away"?"Away":"Home"); }
+function battingTeamForHalf(half){ return half==="top"?"away":"home"; }
+function currentBattingTeam(){ return battingTeamForHalf(scoring.half); }
+function runnerFor(team,index){ const d=collectData(),p=d[team].lineup[index]||{}; return {id:`${team}-${index}`,team,playerIndex:index,name:p.name||`Batter ${index+1}`}; }
+function playsForSlot(team,playerIndex,paIndex){ return scoring.plays.find(p=>p.team===team&&p.playerIndex===playerIndex&&p.paIndex===paIndex); }
+function outcomeOptions(selected=""){
+  return `<option value="">—</option>`+OUTCOMES.map(o=>`<option value="${o.id}" ${o.id===selected?"selected":""}>${escapeHtml(o.code)} — ${escapeHtml(o.label)}</option>`).join("");
 }
-
-function formatLineupPlayer(player) {
-  const first = [];
-  if (player.num) first.push(`#${player.num.replace(/^#/, "")}`);
-  if (player.name) first.push(player.name);
-
-  const details = [];
-  if (player.pos) details.push(player.pos);
-  if (player.bats) details.push(player.bats);
-  const slash = [player.avg, player.obp].filter(Boolean).join("/");
-  if (slash) details.push(slash);
-
-  const left = first.join(" ").trim();
-  if (!left && details.length === 0) return "";
-  return [left, ...details].filter(Boolean).join(" — ");
+function currentPaIndex(team,playerIndex){
+  for(let i=0;i<PA_SLOTS;i++)if(!playsForSlot(team,playerIndex,i))return i;
+  return PA_SLOTS-1;
 }
-
-function formatPitcher(pitcher) {
-  const first = [];
-  if (pitcher.num) first.push(`#${pitcher.num.replace(/^#/, "")}`);
-  if (pitcher.name) first.push(pitcher.name);
-
-  const details = [];
-  if (pitcher.throws) details.push(pitcher.throws);
-  if (pitcher.record) details.push(pitcher.record);
-  if (pitcher.era) details.push(`${pitcher.era.replace(/\s*ERA$/i, "")} ERA`);
-  if (pitcher.k) details.push(`${pitcher.k.replace(/\s*K$/i, "")} K`);
-
-  const left = first.join(" ").trim();
-  if (!left && details.length === 0) return "";
-  return [left, ...details].filter(Boolean).join(" — ");
+function countSnapshot(){
+  ensureScoringState();
+  return {balls:scoring.count.balls,strikes:scoring.count.strikes,pitches:scoring.count.pitches,history:[...scoring.count.history]};
 }
-
-function buildTemplateValues(data) {
-  const awayTitle = withRecord(data.awayTeam, data.awayRecord);
-  const homeTitle = withRecord(data.homeTeam, data.homeRecord);
-  const awayScore = data.awayTeam ? `Away: ${data.awayTeam}` : "";
-  const homeScore = data.homeTeam ? `Home: ${data.homeTeam}` : "";
-
-  return {
-    flat: {
-      topLine: makeTopLine(data),
-      weatherBroadcastBlock: makeWeatherBroadcastBlock(data),
-      replayTitle: "□ Replay Challenge □",
-      awayReplay: data.awayTeam ? `Away: ${data.awayTeam} □ □ EI□` : "",
-      homeReplay: data.homeTeam ? `Home: ${data.homeTeam} □ □ EI□` : "",
-      awayScoreLabel: awayScore,
-      homeScoreLabel: homeScore,
-      awayLineupTitle: awayTitle ? `Away: ${awayTitle}` : "",
-      homeLineupTitle: homeTitle ? `Home: ${homeTitle}` : "",
-      awayPitchingTitle: awayTitle ? `Away: ${awayTitle} Pitching` : "",
-      homePitchingTitle: homeTitle ? `Home: ${homeTitle} Pitching` : "",
-      gameNotesBlock: data.gameNotes ? `Game Notes\n${data.gameNotes}` : "Game Notes"
-    },
-    lists: {
-      awayLineup: data.away.lineup.map(formatLineupPlayer),
-      homeLineup: data.home.lineup.map(formatLineupPlayer),
-      awayPitchers: data.away.pitchers.map(formatPitcher),
-      homePitchers: data.home.pitchers.map(formatPitcher)
-    }
-  };
+function countLabel(count=scoring.count){ return `${num(count?.balls)}-${num(count?.strikes)}`; }
+function pitchSequenceLabel(history=[]){
+  const labels={ball:"B",strike:"S",foul:"F",inplay:"IP"};
+  return history.map(item=>labels[item]||String(item).toUpperCase()).join(" ");
 }
-
-function hasAnyUserData(data) {
-  const copy = JSON.parse(JSON.stringify(data));
-  delete copy.gameDateFormatted;
-  return JSON.stringify(copy).replace(/[\[\]{}":,]/g, "").trim().length > 0;
+function renderQuickResults(){
+  const wrap=$("quickResultGrid");
+  if(!wrap)return;
+  wrap.innerHTML=QUICK_RESULTS.map(([id,label])=>`<button type="button" class="quick-result-button" data-quick-outcome="${id}"><strong>${escapeHtml(OUTCOME_MAP[id]?.code||id)}</strong><span>${escapeHtml(label)}</span></button>`).join("");
 }
-
-function base64ToArrayBuffer(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-function getTemplateArrayBuffer() {
-  if (uploadedTemplateBuffer) return uploadedTemplateBuffer.slice(0);
-  if (typeof EMBEDDED_SCORECARD_TEMPLATE_BASE64 === "undefined") {
-    throw new Error("The built-in blank scorecard is missing.");
+function renderPitchConsole(message=""){
+  ensureScoringState();
+  const count=scoring.count;
+  if($("ballCount"))$("ballCount").textContent=count.balls;
+  if($("strikeCount"))$("strikeCount").textContent=count.strikes;
+  if($("pitchTotalLabel"))$("pitchTotalLabel").textContent=`${count.pitches} pitch${count.pitches===1?"":"es"} this plate appearance`;
+  const status=$("pitchStatus");
+  if(status){
+    const sequence=pitchSequenceLabel(count.history);
+    status.textContent=message || (count.pendingStrikeout?"Strike three. Choose swinging, looking, or dropped third strike.":count.inPlay?"Ball is in play. Choose the result code below.":sequence?`Pitch sequence: ${sequence}`:"Ready for the first pitch.");
   }
-  return base64ToArrayBuffer(EMBEDDED_SCORECARD_TEMPLATE_BASE64);
+  if($("strikeoutChooser"))$("strikeoutChooser").hidden=!count.pendingStrikeout;
+  if($("undoPitchBtn"))$("undoPitchBtn").disabled=!count.history.length;
+  if($("resetCountBtn"))$("resetCountBtn").disabled=!(count.history.length||count.balls||count.strikes||count.inPlay);
+  document.querySelectorAll("[data-pitch]").forEach(button=>button.disabled=count.pendingStrikeout);
 }
-
-function downloadBlob(blob, fileName) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+function resetCurrentCount(message="Count reset to 0-0."){
+  scoring.count=initialCount();
+  renderScoreboard();
+  renderPitchConsole(message);
+  scheduleAutosave("Pitch count reset");
 }
-
-function downloadArrayBuffer(buffer, fileName, mimeType) {
-  const blob = new Blob([buffer], { type: mimeType || "application/octet-stream" });
-  downloadBlob(blob, fileName);
-}
-
-function makeExportFileName(data, blank = false) {
-  const date = data.gameDate || new Date().toISOString().slice(0, 10);
-  const away = cleanFilePart(data.awayTeam || "Away");
-  const home = cleanFilePart(data.homeTeam || "Home");
-  if (blank || !hasAnyUserData(data)) return "Blank_Baseball_Scorecard.xlsx";
-  return `${date}_${away}_at_${home}_Baseball_Scorecard.xlsx`;
-}
-
-function cleanFilePart(value) {
-  return String(value || "").replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "") || "Team";
-}
-
-function makePdfFileName(data, blank = false) {
-  const date = data.gameDate || new Date().toISOString().slice(0, 10);
-  const away = cleanFilePart(data.awayTeam || "Away");
-  const home = cleanFilePart(data.homeTeam || "Home");
-  if (blank || !hasAnyUserData(data)) return "Blank_Baseball_Scorecard.pdf";
-  return `${date}_${away}_at_${home}_Baseball_Scorecard.pdf`;
-}
-
-const PDF_PAGE_WIDTH = 612;
-const PDF_PAGE_HEIGHT = 792;
-let pdfMeasureContext = null;
-
-function getPdfMeasureContext() {
-  if (!pdfMeasureContext) {
-    const canvas = document.createElement("canvas");
-    pdfMeasureContext = canvas.getContext("2d");
+function undoPitch(){
+  ensureScoringState();
+  if(!scoring.count.history.length)return;
+  scoring.count.history.pop();
+  scoring.count.balls=0;scoring.count.strikes=0;scoring.count.pitches=0;scoring.count.pendingStrikeout=false;scoring.count.inPlay=false;
+  for(const pitch of scoring.count.history){
+    scoring.count.pitches++;
+    if(pitch==="ball")scoring.count.balls=Math.min(4,scoring.count.balls+1);
+    else if(pitch==="strike")scoring.count.strikes=Math.min(3,scoring.count.strikes+1);
+    else if(pitch==="foul"&&scoring.count.strikes<2)scoring.count.strikes++;
+    else if(pitch==="inplay")scoring.count.inPlay=true;
   }
-  return pdfMeasureContext;
+  renderScoreboard();
+  renderPitchConsole("Last pitch removed.");
+  scheduleAutosave("Pitch removed");
 }
-
-function sanitizePdfText(value) {
-  return String(value || "")
-    .replace(/\u00a0/g, " ")
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201c\u201d]/g, '"')
-    .replace(/[\u2013\u2014]/g, " - ")
-    .replace(/\u2022/g, " - ")
-    .replace(/\u2026/g, "...")
-    .replace(/[\u25a1\u2610]/g, "")
-    .replace(/[^\x09\x0A\x0D\x20-\xFF]/g, "?");
-}
-
-function measurePdfText(text, size, bold = false) {
-  const ctx = getPdfMeasureContext();
-  ctx.font = `${bold ? 700 : 400} ${size}px Arial, Helvetica, sans-serif`;
-  return ctx.measureText(sanitizePdfText(text)).width;
-}
-
-function fitPdfFontSize(text, maxWidth, preferredSize, minSize, bold = false) {
-  let size = preferredSize;
-  while (size > minSize && measurePdfText(text, size, bold) > maxWidth) size -= 0.25;
-  return Math.max(minSize, size);
-}
-
-function pdfHexString(value) {
-  const text = sanitizePdfText(value);
-  let hex = "";
-  for (const char of text) {
-    const code = char.charCodeAt(0);
-    hex += (code <= 255 ? code : 63).toString(16).padStart(2, "0").toUpperCase();
+function addPitch(type){
+  ensureScoringState();
+  const count=scoring.count;
+  if(count.pendingStrikeout)return;
+  count.history.push(type);count.pitches++;count.inPlay=false;
+  if(type==="ball"){
+    count.balls=Math.min(4,count.balls+1);
+    if(count.balls>=4){renderPitchConsole("Ball four — walk recorded.");recordQuickOutcome("BB",true);return;}
+  }else if(type==="strike"){
+    count.strikes=Math.min(3,count.strikes+1);
+    if(count.strikes>=3){count.pendingStrikeout=true;renderScoreboard();renderPitchConsole();scheduleAutosave("Strike three");return;}
+  }else if(type==="foul"){
+    if(count.strikes<2)count.strikes++;
+  }else if(type==="inplay"){
+    count.inPlay=true;
+    const grid=$("quickResultGrid");if(grid)grid.hidden=false;
+    const toggle=$("toggleQuickResultsBtn");if(toggle){toggle.setAttribute("aria-expanded","true");toggle.textContent="Hide Codes";}
   }
-  return `<${hex}>`;
+  renderScoreboard();
+  renderPitchConsole();
+  scheduleAutosave("Pitch recorded");
 }
-
-function pdfColor(color) {
-  if (color === "white") return "1 1 1";
-  if (color === "blue") return "0.122 0.306 0.471";
-  return "0.067 0.067 0.067";
+function outcomeCanQuickSave(outcomeId){
+  const basesOccupied=Boolean(scoring.bases[1]||scoring.bases[2]||scoring.bases[3]);
+  if(["BB","IBB","HBP","K","KL"].includes(outcomeId))return true;
+  return !basesOccupied&&["1B","2B","3B","HR","GO","FO","LO","PO"].includes(outcomeId);
 }
-
-function addPdfText(commands, value, x, top, maxWidth, preferredSize, options = {}) {
-  const text = sanitizePdfText(value).trim();
-  if (!text) return;
-  const bold = options.bold !== false;
-  const size = fitPdfFontSize(text, maxWidth, preferredSize, options.minSize || 4.5, bold);
-  const width = measurePdfText(text, size, bold);
-  let drawX = x;
-  if (options.align === "center") drawX = x + Math.max(0, (maxWidth - width) / 2);
-  if (options.align === "right") drawX = x + Math.max(0, maxWidth - width);
-  const baselineY = PDF_PAGE_HEIGHT - top - size * 0.95;
-  commands.push(
-    `BT /${bold ? "F2" : "F1"} ${size.toFixed(2)} Tf ${pdfColor(options.color)} rg 1 0 0 1 ${drawX.toFixed(2)} ${baselineY.toFixed(2)} Tm ${pdfHexString(text)} Tj ET`
-  );
-}
-
-function addPdfRectangle(commands, x, top, width, height, color = "blue", lineWidth = 0.7) {
-  const y = PDF_PAGE_HEIGHT - top - height;
-  commands.push(`${pdfColor(color)} RG ${lineWidth.toFixed(2)} w ${x.toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)} re S`);
-}
-
-function wrapPdfText(text, maxWidth, size, bold = false) {
-  const lines = [];
-  const paragraphs = sanitizePdfText(text).split(/\r?\n/);
-  paragraphs.forEach((paragraph, paragraphIndex) => {
-    const words = paragraph.trim().split(/\s+/).filter(Boolean);
-    if (!words.length) {
-      if (paragraphIndex < paragraphs.length - 1) lines.push("");
-      return;
-    }
-    let current = "";
-    words.forEach((word) => {
-      const candidate = current ? `${current} ${word}` : word;
-      if (!current || measurePdfText(candidate, size, bold) <= maxWidth) current = candidate;
-      else {
-        lines.push(current);
-        current = word;
-      }
-    });
-    if (current) lines.push(current);
-  });
-  return lines;
-}
-
-function addPdfNotes(commands, notes) {
-  const clean = sanitizePdfText(notes).trim();
-  if (!clean) return;
-  const x = 423.2;
-  const top = 601.3;
-  const maxWidth = 166.2;
-  const maxHeight = 166.0;
-  let size = 8.4;
-  let lineHeight = 10.1;
-  let lines = wrapPdfText(clean, maxWidth, size, false);
-  while (lines.length * lineHeight > maxHeight && size > 6.2) {
-    size -= 0.25;
-    lineHeight = size * 1.2;
-    lines = wrapPdfText(clean, maxWidth, size, false);
-  }
-  const maxLines = Math.floor(maxHeight / lineHeight);
-  if (lines.length > maxLines) {
-    lines = lines.slice(0, maxLines);
-    const last = lines.length - 1;
-    lines[last] = `${lines[last].replace(/[. ]+$/, "")}...`;
-  }
-  lines.forEach((line, index) => {
-    if (!line) return;
-    addPdfText(commands, line, x, top + index * lineHeight, maxWidth, size, {
-      bold: false,
-      minSize: size,
-      color: "black"
-    });
-  });
-}
-
-function addReplayRow(commands, label, team, x, rightEdge) {
-  if (!team) return;
-  const textWidth = Math.max(34, rightEdge - x - 28);
-  addPdfText(commands, `${label}: ${team}`, x, 65.0, textWidth, 6.4, {
-    bold: true,
-    minSize: 4.3,
-    color: "blue"
-  });
-  const boxTop = 65.4;
-  const boxSize = 5.2;
-  [rightEdge - 23.0, rightEdge - 15.0, rightEdge - 7.0].forEach((boxX) => {
-    addPdfRectangle(commands, boxX, boxTop, boxSize, boxSize, "blue", 0.6);
-  });
-}
-
-function buildPdfOverlayCommands(data) {
-  const values = buildTemplateValues(data);
-  const commands = ["q 612 0 0 792 0 0 cm /Im0 Do Q"];
-
-  addPdfText(commands, values.flat.topLine, 21.4, 21.1, 568.5, 9.9, { bold: true, minSize: 6.2, color: "black" });
-
-  const infoLines = sanitizePdfText(values.flat.weatherBroadcastBlock).split(/\r?\n/).filter(Boolean);
-  infoLines.slice(0, 2).forEach((line, index) => {
-    addPdfText(commands, line, 21.4, 47.5 + index * 11.6, 395.0, 9.7, { bold: true, minSize: 5.5, color: "black" });
-  });
-
-  addReplayRow(commands, "Away", data.awayTeam, 423.0, 503.2);
-  addReplayRow(commands, "Home", data.homeTeam, 506.0, 591.2);
-
-  addPdfText(commands, values.flat.awayScoreLabel, 21.4, 101.0, 180.0, 11.7, { bold: true, minSize: 7.0, color: "blue" });
-  addPdfText(commands, values.flat.homeScoreLabel, 21.4, 117.2, 180.0, 11.7, { bold: true, minSize: 7.0, color: "blue" });
-
-  addPdfText(commands, values.flat.awayLineupTitle, 21.4, 138.2, 395.0, 11.6, { bold: true, minSize: 6.0, color: "white" });
-  addPdfText(commands, values.flat.homeLineupTitle, 21.4, 362.8, 395.0, 11.6, { bold: true, minSize: 6.0, color: "white" });
-
-  const awayLineupTops = [170.6, 191.4, 212.2, 233.0, 253.8, 274.7, 295.5, 316.3, 337.1];
-  const homeLineupTops = [395.2, 416.0, 436.8, 457.6, 478.4, 499.2, 520.1, 540.9, 561.7];
-  values.lists.awayLineup.forEach((text, index) => addPdfText(commands, text, 21.4, awayLineupTops[index], 180.0, 9.7, { bold: true, minSize: 5.2, color: "black" }));
-  values.lists.homeLineup.forEach((text, index) => addPdfText(commands, text, 21.4, homeLineupTops[index], 180.0, 9.7, { bold: true, minSize: 5.2, color: "black" }));
-
-  addPdfText(commands, values.flat.awayPitchingTitle, 21.4, 585.7, 395.0, 10.6, { bold: true, minSize: 4.8, color: "white" });
-  addPdfText(commands, values.flat.homePitchingTitle, 21.4, 678.5, 395.0, 10.6, { bold: true, minSize: 4.8, color: "white" });
-
-  const awayPitcherTops = [612.0, 623.4, 634.8, 646.2, 657.5, 668.9];
-  const homePitcherTops = [704.8, 716.2, 727.6, 738.9, 750.3, 761.7];
-  values.lists.awayPitchers.forEach((text, index) => addPdfText(commands, text, 21.4, awayPitcherTops[index], 180.0, 7.8, { bold: true, minSize: 4.4, color: "black" }));
-  values.lists.homePitchers.forEach((text, index) => addPdfText(commands, text, 21.4, homePitcherTops[index], 180.0, 7.8, { bold: true, minSize: 4.4, color: "black" }));
-
-  addPdfNotes(commands, data.gameNotes);
-  return `${commands.join("\n")}\n`;
-}
-
-function stringToPdfBytes(value) {
-  return new TextEncoder().encode(value);
-}
-
-function concatPdfBytes(chunks) {
-  const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const merged = new Uint8Array(total);
-  let offset = 0;
-  chunks.forEach((chunk) => {
-    merged.set(chunk, offset);
-    offset += chunk.length;
-  });
-  return merged;
-}
-
-function buildScorecardPdfBytes(data) {
-  if (typeof EMBEDDED_SCORECARD_BACKGROUND_JPEG_BASE64 === "undefined") {
-    throw new Error("The built-in PDF scorecard background is missing.");
-  }
-
-  const imageBytes = new Uint8Array(base64ToArrayBuffer(EMBEDDED_SCORECARD_BACKGROUND_JPEG_BASE64));
-  const contentBytes = stringToPdfBytes(buildPdfOverlayCommands(data));
-  const objectCount = 7;
-  const chunks = [];
-  const offsets = new Array(objectCount + 1).fill(0);
-  let length = 0;
-
-  const push = (chunk) => {
-    chunks.push(chunk);
-    length += chunk.length;
-  };
-  const pushText = (text) => push(stringToPdfBytes(text));
-  const addObject = (number, bodyChunks) => {
-    offsets[number] = length;
-    pushText(`${number} 0 obj\n`);
-    bodyChunks.forEach(push);
-    pushText("\nendobj\n");
-  };
-
-  pushText("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
-  addObject(1, [stringToPdfBytes("<< /Type /Catalog /Pages 2 0 R >>")]);
-  addObject(2, [stringToPdfBytes("<< /Type /Pages /Kids [3 0 R] /Count 1 >>")]);
-  addObject(3, [stringToPdfBytes("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> /XObject << /Im0 6 0 R >> >> /Contents 7 0 R >>")]);
-  addObject(4, [stringToPdfBytes("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")]);
-  addObject(5, [stringToPdfBytes("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")]);
-
-  offsets[6] = length;
-  pushText(`6 0 obj\n<< /Type /XObject /Subtype /Image /Width ${EMBEDDED_SCORECARD_BACKGROUND_WIDTH} /Height ${EMBEDDED_SCORECARD_BACKGROUND_HEIGHT} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`);
-  push(imageBytes);
-  pushText("\nendstream\nendobj\n");
-
-  offsets[7] = length;
-  pushText(`7 0 obj\n<< /Length ${contentBytes.length} >>\nstream\n`);
-  push(contentBytes);
-  pushText("endstream\nendobj\n");
-
-  const xrefOffset = length;
-  pushText(`xref\n0 ${objectCount + 1}\n`);
-  pushText("0000000000 65535 f \n");
-  for (let i = 1; i <= objectCount; i++) {
-    pushText(`${String(offsets[i]).padStart(10, "0")} 00000 n \n`);
-  }
-  pushText(`trailer\n<< /Size ${objectCount + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`);
-  return concatPdfBytes(chunks);
-}
-
-async function exportFilledPdf() {
-  setStatus("Creating a one-page PDF scorecard...");
-  try {
-    const data = collectData();
-    const bytes = buildScorecardPdfBytes(data);
-    const fileName = makePdfFileName(data);
-    downloadBlob(new Blob([bytes], { type: "application/pdf" }), fileName);
-    logExport("Created a one-page Letter PDF with 0.25-inch margins.");
-    setStatus("PDF created. It is formatted for one 8.5 × 11 sheet with quarter-inch margins.");
-  } catch (error) {
-    console.error(error);
-    logExport(`PDF export error: ${error.message}`);
-    setStatus(error.message, true);
-    alert(error.message);
-  }
-}
-
-
-function offsetAddress(startAddr, rowOffset) {
-  const match = /^([A-Z]+)(\d+)$/.exec(startAddr);
-  if (!match) throw new Error(`Bad cell address: ${startAddr}`);
-  return `${match[1]}${Number(match[2]) + rowOffset}`;
-}
-
-function columnIndexFromAddress(address) {
-  const letters = /^([A-Z]+)/.exec(address)?.[1] || "A";
-  let index = 0;
-  for (const ch of letters) index = index * 26 + (ch.charCodeAt(0) - 64);
-  return index;
-}
-
-function rowNumberFromAddress(address) {
-  return Number(/(\d+)$/.exec(address)?.[1] || 1);
-}
-
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function parseXml(text) {
-  const doc = new DOMParser().parseFromString(text, "application/xml");
-  const parseError = doc.getElementsByTagName("parsererror")[0];
-  if (parseError) throw new Error(`Could not parse template XML: ${parseError.textContent}`);
-  return doc;
-}
-
-function serializeXml(doc) {
-  return new XMLSerializer().serializeToString(doc);
-}
-
-function getAttrNSorPlain(element, ns, name) {
-  return element.getAttributeNS(ns, name) || element.getAttribute(name);
-}
-
-function getSheetPathFromWorkbook(zip, sheetName) {
-  const workbookXml = zip.file("xl/workbook.xml");
-  const relsXml = zip.file("xl/_rels/workbook.xml.rels");
-  if (!workbookXml || !relsXml) throw new Error("The blank scorecard file is missing required workbook information.");
-
-  return Promise.all([workbookXml.async("text"), relsXml.async("text")]).then(([workbookText, relsText]) => {
-    const workbook = parseXml(workbookText);
-    const rels = parseXml(relsText);
-    const sheets = Array.from(workbook.getElementsByTagNameNS(XML_MAIN_NS, "sheet"));
-    const targetSheet = sheets.find((sheet) => sheet.getAttribute("name") === sheetName) || sheets[0];
-    if (!targetSheet) throw new Error("The blank scorecard has no worksheets.");
-
-    const relationshipId = getAttrNSorPlain(targetSheet, XML_REL_NS, "id");
-    const relationships = Array.from(rels.getElementsByTagNameNS(XML_PACKAGE_REL_NS, "Relationship"));
-    const relationship = relationships.find((rel) => rel.getAttribute("Id") === relationshipId);
-    if (!relationship) throw new Error("Could not find the scorecard worksheet file.");
-
-    let target = relationship.getAttribute("Target") || "";
-    if (target.startsWith("/")) target = target.slice(1);
-    if (!target.startsWith("xl/")) target = `xl/${target}`;
-    return target.replace(/\/+/g, "/");
-  });
-}
-
-function findRow(sheetDoc, rowNumber) {
-  const rows = Array.from(sheetDoc.getElementsByTagNameNS(XML_MAIN_NS, "row"));
-  return rows.find((row) => Number(row.getAttribute("r")) === rowNumber) || null;
-}
-
-function ensureRow(sheetDoc, rowNumber) {
-  const existing = findRow(sheetDoc, rowNumber);
-  if (existing) return existing;
-
-  const sheetData = sheetDoc.getElementsByTagNameNS(XML_MAIN_NS, "sheetData")[0];
-  if (!sheetData) throw new Error("The worksheet is missing sheetData.");
-
-  const row = sheetDoc.createElementNS(XML_MAIN_NS, "x:row");
-  row.setAttribute("r", String(rowNumber));
-
-  const rows = Array.from(sheetData.getElementsByTagNameNS(XML_MAIN_NS, "row"));
-  const nextRow = rows.find((candidate) => Number(candidate.getAttribute("r")) > rowNumber);
-  if (nextRow) sheetData.insertBefore(row, nextRow);
-  else sheetData.appendChild(row);
-  return row;
-}
-
-function findCell(row, address) {
-  const cells = Array.from(row.getElementsByTagNameNS(XML_MAIN_NS, "c"));
-  return cells.find((cell) => cell.getAttribute("r") === address) || null;
-}
-
-function ensureCell(sheetDoc, address) {
-  const rowNumber = rowNumberFromAddress(address);
-  const row = ensureRow(sheetDoc, rowNumber);
-  const existing = findCell(row, address);
-  if (existing) return existing;
-
-  const cell = sheetDoc.createElementNS(XML_MAIN_NS, "x:c");
-  cell.setAttribute("r", address);
-
-  const targetCol = columnIndexFromAddress(address);
-  const cells = Array.from(row.getElementsByTagNameNS(XML_MAIN_NS, "c"));
-  const nextCell = cells.find((candidate) => columnIndexFromAddress(candidate.getAttribute("r")) > targetCol);
-  if (nextCell) row.insertBefore(cell, nextCell);
-  else row.appendChild(cell);
-  return cell;
-}
-
-function setCellInlineString(sheetDoc, address, value) {
-  const cell = ensureCell(sheetDoc, address);
-  while (cell.firstChild) cell.removeChild(cell.firstChild);
-
-  const text = value === undefined || value === null ? "" : String(value);
-  if (text === "") {
-    cell.removeAttribute("t");
+function recordQuickOutcome(outcomeId,forceDirect=false){
+  ensureScoringState();
+  const team=currentBattingTeam(),playerIndex=scoring.battingIndexes[team]||0,paIndex=currentPaIndex(team,playerIndex);
+  if(outcomeId==="D3K"||outcomeId==="OTHER"||(!forceDirect&&!outcomeCanQuickSave(outcomeId))){
+    openPlayDialog(team,playerIndex,paIndex,outcomeId);
     return;
   }
-
-  cell.setAttribute("t", "inlineStr");
-  const inlineString = sheetDoc.createElementNS(XML_MAIN_NS, "x:is");
-  const textNode = sheetDoc.createElementNS(XML_MAIN_NS, "x:t");
-  textNode.setAttributeNS(XML_SPACE_NS, "xml:space", "preserve");
-  textNode.textContent = text;
-  inlineString.appendChild(textNode);
-  cell.appendChild(inlineString);
+  const defaults=defaultDetails(outcomeId,team,playerIndex).d;
+  const incoming={team,playerIndex,paIndex,outcome:outcomeId,pitcher:currentPitcherName(team),inning:scoring.inning,half:scoring.half,runs:defaults.runs,rbi:defaults.rbi,outsOnPlay:defaults.outs,errors:defaults.errors,destinations:{batter:defaults.batter,r1:defaults.r1,r2:defaults.r2,r3:defaults.r3},notes:""};
+  commitPlay(incoming,"");
 }
-
-function writeListToSheet(sheetDoc, listMap, values) {
-  for (let i = 0; i < listMap.rows; i++) {
-    setCellInlineString(sheetDoc, offsetAddress(listMap.start, i), values[i] || "");
-  }
+function handleQuickOutcome(outcomeId){
+  recordQuickOutcome(outcomeId,false);
 }
-
-async function buildWorkbookBlobFromTemplate(data) {
-  if (!window.JSZip) throw new Error("The local ZIP writer library did not load. Make sure vendor/jszip.min.js is included beside index.html.");
-
-  const buffer = getTemplateArrayBuffer();
-  const zip = await JSZip.loadAsync(buffer);
-  const sheetPath = await getSheetPathFromWorkbook(zip, TEMPLATE_MAP.sheet);
-  const sheetFile = zip.file(sheetPath);
-  if (!sheetFile) throw new Error(`Could not find worksheet XML at ${sheetPath}.`);
-
-  const sheetText = await sheetFile.async("text");
-  const sheetDoc = parseXml(sheetText);
-  const values = buildTemplateValues(data);
-
-  Object.entries(TEMPLATE_MAP.cells).forEach(([key, address]) => {
-    setCellInlineString(sheetDoc, address, values.flat[key] || "");
+function handleTerminalStrikeout(outcomeId){
+  if(outcomeId==="D3K")recordQuickOutcome(outcomeId,false);
+  else recordQuickOutcome(outcomeId,true);
+}
+function toggleQuickResults(){
+  const grid=$("quickResultGrid"),button=$("toggleQuickResultsBtn");
+  if(!grid||!button)return;
+  const willHide=!grid.hidden;grid.hidden=willHide;button.setAttribute("aria-expanded",String(!willHide));button.textContent=willHide?"Show Codes":"Hide Codes";
+}
+function scoringPanelActive(){ return $("scoring")?.classList.contains("active"); }
+function handleScoringKeyboard(event){
+  if(!scoringPanelActive()||$("playDialog")?.open)return;
+  const target=event.target;if(target&&target.closest&&target.closest("input,textarea,select,[contenteditable=true]"))return;
+  const key=event.key.toLowerCase();
+  if(scoring.count?.pendingStrikeout&&["k","l","d"].includes(key)){event.preventDefault();handleTerminalStrikeout(key==="k"?"K":key==="l"?"KL":"D3K");return;}
+  const pitchKeys={b:"ball",s:"strike",f:"foul",i:"inplay"};
+  const resultKeys={"1":"1B","2":"2B","3":"3B","4":"HR",w:"BB",h:"HBP",k:"K",g:"GO",o:"FO",l:"LO",p:"PO",e:"ROE",c:"FC"};
+  if(key==="backspace"){event.preventDefault();undoPitch();return;}
+  if(pitchKeys[key]){event.preventDefault();addPitch(pitchKeys[key]);return;}
+  if(resultKeys[key]){event.preventDefault();handleQuickOutcome(resultKeys[key]);}
+}
+function renderScoringGrid(team){
+  const d=collectData(), stats=computeTeamStats(team); let html=`<table class="scoring-table"><thead><tr><th>Batter</th>`;
+  for(let p=0;p<PA_SLOTS;p++) html+=`<th>PA ${p+1}</th>`;
+  html+=`<th class="stat-cell">AB</th><th class="stat-cell">R</th><th class="stat-cell">H</th><th class="stat-cell">RBI</th></tr></thead><tbody>`;
+  d[team].lineup.forEach((player,i)=>{
+    const f=formatPlayer(player,i); html+=`<tr><td class="player-cell"><strong>${escapeHtml(f.name)}</strong><span>${escapeHtml(f.detail)}</span></td>`;
+    for(let p=0;p<PA_SLOTS;p++){
+      const play=playsForSlot(team,i,p); html+=`<td><select class="pa-select ${play?"has-play":""}" data-team="${team}" data-player="${i}" data-pa="${p}" aria-label="${escapeHtml(f.name)} plate appearance ${p+1}">${outcomeOptions(play?.outcome||"")}</select></td>`;
+    }
+    const s=stats[i]; html+=`<td class="stat-cell">${s.ab}</td><td class="stat-cell">${s.r}</td><td class="stat-cell">${s.h}</td><td class="stat-cell">${s.rbi}</td></tr>`;
   });
-  writeListToSheet(sheetDoc, TEMPLATE_MAP.lists.awayLineup, values.lists.awayLineup);
-  writeListToSheet(sheetDoc, TEMPLATE_MAP.lists.homeLineup, values.lists.homeLineup);
-  writeListToSheet(sheetDoc, TEMPLATE_MAP.lists.awayPitchers, values.lists.awayPitchers);
-  writeListToSheet(sheetDoc, TEMPLATE_MAP.lists.homePitchers, values.lists.homePitchers);
-
-  zip.file(sheetPath, serializeXml(sheetDoc));
-  return zip.generateAsync({ type: "blob", compression: "DEFLATE" });
+  html+=`</tbody></table>`; $(`${team}ScoringGrid`).innerHTML=html;
 }
-
-async function exportFilledExcel() {
-  setStatus("Creating your scorecard...");
-  try {
-    const data = collectData();
-
-    if (!hasAnyUserData(data)) {
-      const buffer = getTemplateArrayBuffer();
-      downloadArrayBuffer(buffer, TEMPLATE_FILE_NAME, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      logExport("Downloaded a blank scorecard.");
-      setStatus("Downloaded a blank scorecard.");
-      return;
+function renderScoring(){
+  renderScoringGrid("away"); renderScoringGrid("home");
+  document.querySelectorAll(".pa-select").forEach(select=>{
+    select.addEventListener("change",e=>{ if(e.target.value) openPlayDialog(e.target.dataset.team,num(e.target.dataset.player),num(e.target.dataset.pa),e.target.value); else {const play=playsForSlot(e.target.dataset.team,num(e.target.dataset.player),num(e.target.dataset.pa));if(play&&confirm("Delete this recorded play?")) deletePlay(play.id);else renderScoring();} });
+    select.addEventListener("pointerdown",e=>{const play=playsForSlot(e.currentTarget.dataset.team,num(e.currentTarget.dataset.player),num(e.currentTarget.dataset.pa));if(play){e.preventDefault();openPlayDialog(play.team,play.playerIndex,play.paIndex,play.outcome,play);}});
+  });
+  renderScoreboard();
+  renderPitchConsole();
+}
+function renderScoreboard(){
+  const totals=computeGameTotals();
+  $("scoreAwayName").textContent=teamName("away"); $("scoreHomeName").textContent=teamName("home");
+  $("scoreAwayRuns").textContent=totals.away.runs; $("scoreHomeRuns").textContent=totals.home.runs;
+  $("inningLabel").textContent=`${scoring.half==="top"?"Top":"Bottom"} ${scoring.inning}`; $("outsLabel").textContent=`${scoring.outs} ${scoring.outs===1?"out":"outs"}`;
+  [1,2,3].forEach(base=>$(base===1?"base1":base===2?"base2":"base3").classList.toggle("occupied",Boolean(scoring.bases[base])));
+  const team=currentBattingTeam(), index=scoring.battingIndexes[team]||0, p=collectData()[team].lineup[index]||{};
+  $("currentBatterName").textContent=p.name||`${teamName(team)} batter ${index+1}`;
+  const paCount=scoring.plays.filter(x=>x.team===team&&x.playerIndex===index).length;
+  ensureScoringState();
+  $("currentBatterMeta").textContent=`${scoring.half==="top"?"Top":"Bottom"} ${scoring.inning} • batting ${index+1} • plate appearance ${paCount+1} • count ${countLabel()}`;
+}
+function fillDestinationSelect(id,options){ $(id).innerHTML=options.map(([v,l])=>`<option value="${v}">${l}</option>`).join(""); }
+function defaultDetails(outcomeId,team,playerIndex){
+  const o=OUTCOME_MAP[outcomeId]||OUTCOME_MAP.OTHER; const currentTeam=currentBattingTeam();
+  const before=(team===currentTeam)?deepClone(scoring.bases):emptyBases();
+  const d={batter:"out",r1:before[1]?"hold":"empty",r2:before[2]?"hold":"empty",r3:before[3]?"hold":"empty",outs:o.out?1:0,runs:0,rbi:0,errors:0};
+  if(o.bases===1){d.batter="1";if(before[1])d.r1="2";if(before[2])d.r2="3";if(before[3]){d.r3="home";d.runs++;d.rbi++;}}
+  else if(o.bases===2){d.batter="2";if(before[1])d.r1="3";if(before[2]){d.r2="home";d.runs++;d.rbi++;}if(before[3]){d.r3="home";d.runs++;d.rbi++;}}
+  else if(o.bases===3){d.batter="3";[1,2,3].forEach(b=>{if(before[b]){d[`r${b}`]="home";d.runs++;d.rbi++;}});}
+  else if(o.bases===4){d.batter="home";d.runs=1;d.rbi=1;[1,2,3].forEach(b=>{if(before[b]){d[`r${b}`]="home";d.runs++;d.rbi++;}});}
+  else if(["BB","IBB","HBP","CI","OBS","D3K"].includes(outcomeId)){
+    d.batter="1";
+    if(before[1]){d.r1="2";if(before[2]){d.r2="3";if(before[3]){d.r3="home";d.runs++;if(outcomeId!=="D3K")d.rbi++;}}}
+  } else if(outcomeId==="ROE"){d.batter="1";d.errors=1;if(before[1])d.r1="2";if(before[2])d.r2="3";if(before[3])d.r3="home",d.runs++;}
+  else if(outcomeId==="FC"){d.batter="1";if(before[1])d.r1="out";else if(before[2])d.r2="out";else if(before[3])d.r3="out";d.outs=1;}
+  else if(outcomeId==="SF"){d.batter="out";d.outs=1;if(before[3]){d.r3="home";d.runs=1;d.rbi=1;}}
+  else if(outcomeId==="SH"){d.batter="out";d.outs=1;if(before[3])d.r3="home",d.runs++;if(before[2])d.r2="3";if(before[1])d.r1="2";}
+  else if(outcomeId==="DP"){d.batter="out";d.outs=2;if(before[1])d.r1="out";else if(before[2])d.r2="out";else if(before[3])d.r3="out";}
+  else if(outcomeId==="TP"){d.batter="out";d.outs=3;[1,2,3].forEach(b=>{if(before[b])d[`r${b}`]="out";});}
+  return {before,d};
+}
+function openPlayDialog(team,playerIndex,paIndex,outcomeId,existing=null){
+  const data=collectData(),player=data[team].lineup[playerIndex]||{};
+  $("dialogTeam").value=team;$("dialogPlayerIndex").value=playerIndex;$("dialogPaIndex").value=paIndex;$("dialogPlayId").value=existing?.id||"";
+  ensureScoringState();
+  $("dialogTitle").textContent=`${player.name||`Batter ${playerIndex+1}`} — PA ${paIndex+1} — ${existing?.pitchCount?countLabel(existing.pitchCount):countLabel()}`;
+  $("playOutcome").innerHTML=OUTCOMES.map(o=>`<option value="${o.id}">${escapeHtml(o.code)} — ${escapeHtml(o.label)}</option>`).join("");
+  fillDestinationSelect("batterDestination",BATTER_DESTINATIONS); ["runner1Destination","runner2Destination","runner3Destination"].forEach(id=>fillDestinationSelect(id,DESTINATIONS));
+  const defaults=defaultDetails(outcomeId,team,playerIndex); const v=existing||{};
+  $("playOutcome").value=v.outcome||outcomeId; $("playPitcher").value=v.pitcher||currentPitcherName(team); $("playInning").value=v.inning||scoring.inning; $("playHalf").value=v.half||(team==="away"?"top":"bottom");
+  $("playRuns").value=v.runs??defaults.d.runs; $("playRbi").value=v.rbi??defaults.d.rbi; $("playOuts").value=v.outsOnPlay??defaults.d.outs; $("playErrors").value=v.errors??defaults.d.errors;
+  $("batterDestination").value=v.destinations?.batter||defaults.d.batter; $("runner1Destination").value=v.destinations?.r1||defaults.d.r1; $("runner2Destination").value=v.destinations?.r2||defaults.d.r2; $("runner3Destination").value=v.destinations?.r3||defaults.d.r3; $("playNotes").value=v.notes||"";
+  $("deletePlayBtn").hidden=!existing; $("playDialog").showModal();
+}
+function currentPitcherName(battingTeam){ const field=battingTeam==="away"?"homePitcher1":"awayPitcher1"; return getField(field); }
+function getPlayFromDialog(){
+  return {team:$("dialogTeam").value,playerIndex:num($("dialogPlayerIndex").value),paIndex:num($("dialogPaIndex").value),outcome:$("playOutcome").value,pitcher:getField("playPitcher"),inning:Math.max(1,num($("playInning").value)),half:$("playHalf").value,runs:Math.max(0,num($("playRuns").value)),rbi:Math.max(0,num($("playRbi").value)),outsOnPlay:Math.max(0,num($("playOuts").value)),errors:Math.max(0,num($("playErrors").value)),destinations:{batter:$("batterDestination").value,r1:$("runner1Destination").value,r2:$("runner2Destination").value,r3:$("runner3Destination").value},notes:getField("playNotes")};
+}
+function applyDestinations(beforeBases,team,playerIndex,destinations){
+  const post=emptyBases(); const batter=runnerFor(team,playerIndex); const runners={r1:beforeBases[1],r2:beforeBases[2],r3:beforeBases[3],batter};
+  for(const [key,runner] of Object.entries(runners)){
+    if(!runner) continue; const dest=destinations[key]; if(["1","2","3"].includes(dest)) post[dest]=runner;
+  }
+  return post;
+}
+function nextHalfState(inning,half){ return half==="top"?{inning,half:"bottom"}:{inning:inning+1,half:"top"}; }
+function buildAfterState(play,beforeState){
+  const outs=beforeState.outs+play.outsOnPlay; let after={inning:play.inning,half:play.half,outs,bases:applyDestinations(beforeState.bases,play.team,play.playerIndex,play.destinations),battingIndexes:deepClone(beforeState.battingIndexes)};
+  after.battingIndexes[play.team]=(play.playerIndex+1)%LINEUP_ROWS;
+  if(outs>=3){const n=nextHalfState(play.inning,play.half);after={...after,...n,outs:0,bases:emptyBases()};}
+  return after;
+}
+function commitPlay(incoming,existingId=""){
+  ensureScoringState();
+  const existing=scoring.plays.find(p=>p.id===existingId);
+  let beforeState;
+  if(existing) beforeState=deepClone(existing.beforeState);
+  else {
+    const chosenTeam=battingTeamForHalf(incoming.half);
+    beforeState={inning:incoming.inning,half:incoming.half,outs:(incoming.inning===scoring.inning&&incoming.half===scoring.half)?scoring.outs:0,bases:(incoming.inning===scoring.inning&&incoming.half===scoring.half&&incoming.team===chosenTeam)?deepClone(scoring.bases):emptyBases(),battingIndexes:deepClone(scoring.battingIndexes)};
+  }
+  const pitchCount=existing?.pitchCount||countSnapshot();
+  const play={...incoming,id:existing?.id||makeId(),seq:existing?.seq||scoring.nextSeq++,beforeState,pitchCount,pitchSequence:existing?.pitchSequence||pitchSequenceLabel(pitchCount.history),playerName:collectData()[incoming.team].lineup[incoming.playerIndex]?.name||`Batter ${incoming.playerIndex+1}`,outcomeCode:OUTCOME_MAP[incoming.outcome]?.code||incoming.outcome};
+  play.afterState=buildAfterState(play,beforeState);
+  if(existing){const idx=scoring.plays.findIndex(p=>p.id===existing.id);scoring.plays[idx]=play;} else scoring.plays.push(play);
+  scoring.plays.sort((a,b)=>a.seq-b.seq);
+  if(!existing)scoring.count=initialCount();
+  syncCurrentToLastPlay();refreshAll();scheduleAutosave("Play saved");
+  return play;
+}
+function recordPlay(event){
+  event.preventDefault();
+  commitPlay(getPlayFromDialog(),$("dialogPlayId").value);
+  $("playDialog").close();
+}
+function syncCurrentToLastPlay(){
+  const last=[...scoring.plays].sort((a,b)=>a.seq-b.seq).at(-1);
+  if(last){scoring.inning=last.afterState.inning;scoring.half=last.afterState.half;scoring.outs=last.afterState.outs;scoring.bases=deepClone(last.afterState.bases);scoring.battingIndexes=deepClone(last.afterState.battingIndexes);ensureScoringState();} else scoring=initialScoring();
+}
+function deletePlay(id){
+  const idx=scoring.plays.findIndex(p=>p.id===id); if(idx<0)return; const wasLast=idx===scoring.plays.length-1; scoring.plays.splice(idx,1); if(wasLast) syncCurrentToLastPlay(); refreshAll(); scheduleAutosave("Play deleted");
+}
+function undoLastPlay(){ const last=[...scoring.plays].sort((a,b)=>a.seq-b.seq).at(-1); if(!last)return; deletePlay(last.id); }
+function manualChangeHalf(){
+  const n=nextHalfState(scoring.inning,scoring.half); scoring.inning=n.inning;scoring.half=n.half;scoring.outs=0;scoring.bases=emptyBases();scoring.count=initialCount();refreshAll();scheduleAutosave("Half-inning changed");
+}
+function clearPersistentGameData(){
+  clearTimeout(autosaveTimer);
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){
+      const key=localStorage.key(i)||"";
+      if(LEGACY_STORAGE_PREFIXES.some(prefix=>key.startsWith(prefix))) localStorage.removeItem(key);
     }
+  }catch(err){ console.warn("Stored game data could not be cleared.",err); }
+}
+function blankEntireGame(message="Blank game ready. Choose a scheduled game or enter one manually.",returnToSetup=true){
+  clearPersistentGameData();
+  scoring=initialScoring();
+  setFieldsFromData({});
+  refreshAll();
+  if(returnToSetup) setPanel("setup");
+  if($("autosaveBar")) $("autosaveBar").textContent=message;
+}
+function resetScoring(){
+  if(!confirm("Reset the entire game? This clears every team, lineup, pitcher, note, and recorded play."))return;
+  blankEntireGame("Game reset. All scorecard fields and scoring totals are blank.");
+}
 
-    const blob = await buildWorkbookBlobFromTemplate(data);
-    const fileName = makeExportFileName(data);
-    downloadBlob(blob, fileName);
-    const source = uploadedTemplateName || DEFAULT_TEMPLATE_LABEL;
-    logExport(`Created scorecard workbook using ${source}. Layout and print settings were preserved.`);
-    setStatus("Excel scorecard created. Open the workbook to print or continue editing.");
-  } catch (error) {
-    console.error(error);
-    logExport(`Export error: ${error.message}`);
-    setStatus(error.message, true);
-    alert(error.message);
+function computeTeamStats(team){
+  const rows=Array.from({length:LINEUP_ROWS},()=>({pa:0,ab:0,r:0,h:0,rbi:0,bb:0,k:0,hr:0}));
+  scoring.plays.filter(p=>p.team===team).forEach(p=>{const s=rows[p.playerIndex]||rows[0],o=OUTCOME_MAP[p.outcome]||{};s.pa++;if(o.ab)s.ab++;s.h+=o.hit||0;s.rbi+=p.rbi||0;s.bb+=o.bb||0;s.k+=o.k||0;s.hr+=o.hr||0;});
+  scoring.plays.forEach(p=>{
+    const before=p.beforeState?.bases||{}; const sources={batter:runnerFor(p.team,p.playerIndex),r1:before[1],r2:before[2],r3:before[3]};
+    Object.entries(p.destinations||{}).forEach(([k,d])=>{const r=sources[k];if(d==="home"&&r?.team===team&&rows[r.playerIndex])rows[r.playerIndex].r++;});
+  });
+  return rows;
+}
+function computeGameTotals(){
+  const result={away:{runs:0,hits:0,errors:0,innings:Array(30).fill(0)},home:{runs:0,hits:0,errors:0,innings:Array(30).fill(0)}};
+  for(const team of ["away","home"]){const stats=computeTeamStats(team);result[team].runs=sum(scoring.plays.filter(p=>p.team===team).map(p=>p.runs));result[team].hits=sum(stats.map(s=>s.h));result[team].errors=sum(scoring.plays.filter(p=>p.team!==team).map(p=>p.errors));scoring.plays.filter(p=>p.team===team).forEach(p=>{result[team].innings[p.inning-1]+=p.runs||0;});}
+  return result;
+}
+function playNotation(play){
+  let text=play.outcomeCode||play.outcome; const extras=[]; if(play.rbi)extras.push(`${play.rbi} RBI`);if(play.runs)extras.push(`${play.runs} R`);if(play.errors)extras.push(`${play.errors} E`);return extras.length?`${text} ${extras.join("/")}`:text;
+}
+function playsByBatterInning(team,playerIndex,inning){ return scoring.plays.filter(p=>p.team===team&&p.playerIndex===playerIndex&&p.inning===inning).sort((a,b)=>a.seq-b.seq); }
+function renderLineScoreTable(){
+  const d=collectData(),t=computeGameTotals(),maxInning=Math.max(9,Math.min(12,scoring.inning)); let h=`<table class="line-score-table"><thead><tr><th>Team</th>`;for(let i=1;i<=maxInning;i++)h+=`<th>${i}</th>`;h+=`<th>R</th><th>H</th><th>E</th></tr></thead><tbody>`;
+  for(const team of ["away","home"]){h+=`<tr><th>${escapeHtml(d[`${team}Team`]||team)}</th>`;for(let i=0;i<maxInning;i++)h+=`<td>${t[team].innings[i]||0}</td>`;h+=`<td><strong>${t[team].runs}</strong></td><td>${t[team].hits}</td><td>${t[team].errors}</td></tr>`;}return h+`</tbody></table>`;
+}
+function renderBattingTable(team){
+  const d=collectData(),stats=computeTeamStats(team);let h=`<h4>${escapeHtml(d[`${team}Team`]||team)}</h4><table class="batting-table"><thead><tr><th>Player</th><th>PA</th><th>AB</th><th>R</th><th>H</th><th>RBI</th><th>BB</th><th>K</th><th>HR</th></tr></thead><tbody>`;
+  d[team].lineup.forEach((p,i)=>{const s=stats[i];h+=`<tr><td>${escapeHtml(p.name||`Batter ${i+1}`)}</td><td>${s.pa}</td><td>${s.ab}</td><td>${s.r}</td><td>${s.h}</td><td>${s.rbi}</td><td>${s.bb}</td><td>${s.k}</td><td>${s.hr}</td></tr>`;});return h+`</tbody></table>`;
+}
+function renderSummary(){
+  $("lineScoreSummary").innerHTML=renderLineScoreTable(); $("battingSummary").innerHTML=renderBattingTable("away")+renderBattingTable("home");
+  const log=[...scoring.plays].sort((a,b)=>b.seq-a.seq);$("playLog").innerHTML=log.length?log.map(p=>{const count=p.pitchCount?`Count ${countLabel(p.pitchCount)}`:"Count not recorded";const sequence=p.pitchSequence?` • Pitches: ${p.pitchSequence}`:"";return `<div class="play-log-item"><strong>${p.half==="top"?"Top":"Bottom"} ${p.inning} — ${escapeHtml(p.playerName)}: ${escapeHtml(playNotation(p))}</strong><p>${escapeHtml(`${count}${sequence}${p.notes?` • ${p.notes}`:` • ${p.outsOnPlay} out(s), ${p.runs} run(s)`}`)}</p></div>`;}).join(""):`<p>No plays recorded yet.</p>`;
+}
+function refreshHeadings(){ const a=teamName("away"),h=teamName("home");$("awayLineupHeading").textContent=`${a} Lineup`;$("homeLineupHeading").textContent=`${h} Lineup`;$("awayPitcherHeading").textContent=`${a} Pitchers`;$("homePitcherHeading").textContent=`${h} Pitchers`;$("awayScoringHeading").textContent=`${a} Batters`;$("homeScoringHeading").textContent=`${h} Batters`; }
+function refreshAll(){ refreshHeadings();renderScoring();renderSummary(); }
+
+function serializeApp(){ return {app:"Guariglia Baseball Scorecard Builder",version:21,savedAt:new Date().toISOString(),data:collectData(),scoring}; }
+function scheduleAutosave(message="Current session updated"){
+  clearTimeout(autosaveTimer);
+  if($("autosaveBar")) $("autosaveBar").textContent=`${message}…`;
+  autosaveTimer=setTimeout(()=>{
+    if($("autosaveBar")) $("autosaveBar").textContent=`Current session updated ${new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}. Use Save Game File to keep it.`;
+  },350);
+}
+function downloadBlob(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);}
+function safeFileName(value){return String(value||"baseball-game").replace(/[^a-z0-9._-]+/gi,"_").replace(/^_+|_+$/g,"");}
+function saveGameFile(){const d=collectData(),name=safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"game"}`);downloadBlob(new Blob([JSON.stringify(serializeApp(),null,2)],{type:"application/json"}),`${name}.scoregame.json`);}
+async function openGameFile(file){
+  try{const saved=JSON.parse(await file.text());if(!saved.data||!saved.scoring)throw new Error("This is not a compatible Version 11 through Version 21 game file.");setFieldsFromData(saved.data);scoring=saved.scoring;ensureScoringState();refreshAll();scheduleAutosave("Game file opened");setPanel("scoring");}catch(err){alert(`Could not open the game file: ${err.message}`);}
+}
+function clearForManual(){
+  if(!confirm("Start a blank game? This clears every current scorecard field and recorded play."))return;
+  blankEntireGame("Blank manual game ready. All scorecard fields and scoring totals are empty.");
+}
+
+function dateDisplay(value){if(!value)return"";const d=new Date(`${value}T12:00:00`);return d.toLocaleDateString(undefined,{month:"short",day:"numeric",year:"numeric"});}
+function setConnectionState(state,message){
+  const badge=$("connectionBadge");
+  if(!badge)return;
+  badge.className=`connection-badge ${state}`;
+  badge.textContent=message;
+}
+function restoreRefreshPosition(anchor, previousScrollX, previousScrollY){
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const root=document.documentElement;
+    const priorInlineBehavior=root.style.scrollBehavior;
+    root.style.scrollBehavior="auto";
+    window.scrollTo(previousScrollX,previousScrollY);
+    anchor?.focus({preventScroll:true});
+    root.style.scrollBehavior=priorInlineBehavior;
+  }));
+}
+async function refreshScheduleAndClear(){
+  const refreshButton=$("refreshGamesBtn");
+  const previousScrollX=window.scrollX;
+  const previousScrollY=window.scrollY;
+  const selectedDate=getField("lookupDate");
+  const selectedLevel=getField("scheduleLevel")||"mlb";
+  blankEntireGame("Schedule refreshed. All previously populated game data and scoring were cleared.",false);
+  setField("lookupDate",selectedDate);
+  setField("scheduleLevel",selectedLevel);
+  scheduleGames=[];
+  $("dailyGameSelect").innerHTML='<option value="">Loading scheduled games…</option>';
+  $("lookupGameBtn").disabled=true;
+  try{
+    await loadSchedule();
+  }finally{
+    restoreRefreshPosition(refreshButton,previousScrollX,previousScrollY);
   }
 }
 
-function downloadBlankTemplate() {
-  try {
-    const buffer = getTemplateArrayBuffer();
-    const fileName = uploadedTemplateName || TEMPLATE_FILE_NAME;
-    downloadArrayBuffer(buffer, fileName, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    logExport("Downloaded a blank scorecard.");
-  } catch (error) {
-    setStatus(error.message, true);
-    alert(error.message);
+async function loadSchedule(){
+  const date=getField("lookupDate"),level=getField("scheduleLevel");
+  if(!date)return;
+  const requestToken=++scheduleRequestToken;
+  scheduleGames=[];
+  $("dailyGameSelect").innerHTML='<option value="">Loading scheduled games…</option>';
+  $("lookupStatus").textContent="Connecting to official baseball schedule data…";
+  setConnectionState("checking","Checking connection…");
+  $("refreshGamesBtn").disabled=true;
+  $("lookupGameBtn").disabled=true;
+  try{
+    if(!globalThis.BaseballData)throw new Error("The baseball-data connection module is missing.");
+    const payload=await BaseballData.getSchedule(date,level);
+    if(requestToken!==scheduleRequestToken)return;
+    scheduleGames=payload.games||[];
+    $("dailyGameSelect").innerHTML=scheduleGames.length
+      ?'<option value="">Choose a matchup</option>'+scheduleGames.map((game,index)=>`<option value="${index}">${escapeHtml(game.label)}</option>`).join("")
+      :'<option value="">No games found</option>';
+    setConnectionState("connected","Online schedule connected");
+    const source=payload.source?` Connection: ${payload.source}.`:"";
+    $("lookupStatus").textContent=scheduleGames.length
+      ?`${scheduleGames.length} game${scheduleGames.length===1?"":"s"} available for ${dateDisplay(date)}.${source}`
+      :`The connection is working, but no scheduled games were returned for ${dateDisplay(date)} and that level.${source}`;
+  }catch(err){
+    if(requestToken!==scheduleRequestToken)return;
+    console.error(err);
+    $("dailyGameSelect").innerHTML='<option value="">Schedule unavailable — use Refresh Schedule</option>';
+    setConnectionState("disconnected","Schedule connection unavailable");
+    $("lookupStatus").textContent=`The online schedule could not be loaded: ${err.message || "unknown connection error"}. Select Refresh Schedule to try again, or use manual entry.`;
+  }finally{
+    if(requestToken===scheduleRequestToken)$("refreshGamesBtn").disabled=false;
+  }
+}
+async function loadSelectedGame(){
+  const rawIndex=$("dailyGameSelect").value;
+  if(rawIndex==="")return;
+  const game=scheduleGames[num(rawIndex)];
+  if(!game)return;
+  $("lookupStatus").textContent="Loading teams, venue, lineups, pitchers, broadcasts, and available game details…";
+  setConnectionState("checking","Loading selected game…");
+  $("lookupGameBtn").disabled=true;
+  try{
+    if(!globalThis.BaseballData)throw new Error("The baseball-data connection module is missing.");
+    const payload=await BaseballData.getGame(game.gamePk);
+    setFieldsFromData(payload.data||{});
+    scoring=initialScoring();
+    refreshAll();
+    scheduleAutosave("Official game information loaded");
+    setConnectionState("connected","Selected game connected");
+    const source=payload.source?` Connection: ${payload.source}.`:"";
+    $("lookupStatus").textContent=`Game information loaded. Review the populated game information below before moving to the next section.${source}`;
+    setPanel("setup");
+  }catch(err){
+    console.error(err);
+    setConnectionState("disconnected","Game details unavailable");
+    $("lookupStatus").textContent=`The selected game could not be loaded: ${err.message || "unknown connection error"}. Refresh the schedule or enter the game manually.`;
+  }finally{
+    $("lookupGameBtn").disabled=!$("dailyGameSelect").value;
   }
 }
 
-async function handleTemplateUpload(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
-  try {
-    uploadedTemplateBuffer = await file.arrayBuffer();
-    uploadedTemplateName = file.name;
-    $("templateStatus").textContent = "Using your uploaded blank scorecard.";
-    logExport("Loaded an uploaded blank scorecard.");
-  } catch (error) {
-    uploadedTemplateBuffer = null;
-    uploadedTemplateName = "";
-    $("templateStatus").textContent = "Could not load that file. Using the built-in blank scorecard.";
-    logExport(`Template upload error: ${error.message}`);
-  }
+function base64ToArrayBuffer(base64){const binary=atob(base64),bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return bytes.buffer;}
+function getTemplateArrayBuffer(){if(uploadedTemplateBuffer)return uploadedTemplateBuffer.slice(0);return base64ToArrayBuffer(EMBEDDED_SCORECARD_TEMPLATE_BASE64);}
+function colNumber(ref){let n=0;for(const c of ref.match(/[A-Z]+/)[0])n=n*26+c.charCodeAt(0)-64;return n;}
+function ensureCell(doc,ref){
+  const ns="http://schemas.openxmlformats.org/spreadsheetml/2006/main",rowNum=num(ref.match(/\d+/)[0]),sheetData=doc.getElementsByTagNameNS(ns,"sheetData")[0];let row=[...doc.getElementsByTagNameNS(ns,"row")].find(r=>num(r.getAttribute("r"))===rowNum);
+  if(!row){row=doc.createElementNS(ns,"row");row.setAttribute("r",rowNum);const rows=[...sheetData.children];const before=rows.find(r=>num(r.getAttribute("r"))>rowNum);before?sheetData.insertBefore(row,before):sheetData.appendChild(row);}
+  let cell=[...row.getElementsByTagNameNS(ns,"c")].find(c=>c.getAttribute("r")===ref);if(!cell){cell=doc.createElementNS(ns,"c");cell.setAttribute("r",ref);const before=[...row.children].find(c=>colNumber(c.getAttribute("r"))>colNumber(ref));before?row.insertBefore(cell,before):row.appendChild(cell);}return cell;
 }
-
-async function validateTemplate() {
-  try {
-    if (!window.JSZip) throw new Error("A required local export file did not load.");
-    const buffer = getTemplateArrayBuffer();
-    const zip = await JSZip.loadAsync(buffer);
-    const sheetPath = await getSheetPathFromWorkbook(zip, TEMPLATE_MAP.sheet);
-    const sheetText = await zip.file(sheetPath).async("text");
-
-    const expectedAddresses = ["A2", "A3", "J3", "J4", "M4", "A6", "A7", "A9", "A11", "A21", "A23", "A33", "A35", "A41", "A43", "J33"];
-    const missing = expectedAddresses.filter((addr) => !new RegExp(`<[^>]*c[^>]*\\sr=[\"']${escapeRegex(addr)}[\"']`).test(sheetText));
-    if (missing.length) {
-      throw new Error("Scorecard check found missing mapped areas. The uploaded file may not match this app.");
+function clearCellChildren(cell){while(cell.firstChild)cell.removeChild(cell.firstChild);}
+function setXmlCell(doc,ref,value,type="string"){
+  const ns="http://schemas.openxmlformats.org/spreadsheetml/2006/main",cell=ensureCell(doc,ref);clearCellChildren(cell);
+  if(type==="number"){cell.setAttribute("t","n");const v=doc.createElementNS(ns,"v");v.textContent=String(num(value));cell.appendChild(v);} else {cell.setAttribute("t","inlineStr");const is=doc.createElementNS(ns,"is"),t=doc.createElementNS(ns,"t");t.setAttribute("xml:space","preserve");t.textContent=String(value??"");is.appendChild(t);cell.appendChild(is);}
+}
+function columnLetter(n){let s="";while(n){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26);}return s;}
+function topLine(d){return [[d.awayTeam,d.homeTeam].some(Boolean)?`${d.awayTeam||"Away"} at ${d.homeTeam||"Home"}`:"",dateDisplay(d.gameDate),d.gameTime,d.venue,[d.awayRecord,d.homeRecord].filter(Boolean).join(" / "),d.gameNumber].filter(Boolean).join(" • ");}
+function exportNotes(d,t){const score=`Final / Current Score: ${d.awayTeam||"Away"} ${t.away.runs}, ${d.homeTeam||"Home"} ${t.home.runs}`;const recent=[...scoring.plays].sort((a,b)=>a.seq-b.seq).slice(-12).map(p=>`${p.half==="top"?"T":"B"}${p.inning} ${p.playerName}: ${playNotation(p)}`).join("; ");return ["Game Notes",score,d.gameNotes,recent].filter(Boolean).join("\n");}
+async function exportExcel(){
+  try{
+    const d=collectData(),t=computeGameTotals(),zip=await JSZip.loadAsync(getTemplateArrayBuffer()),path="xl/worksheets/sheet1.xml",xml=await zip.file(path).async("text"),doc=new DOMParser().parseFromString(xml,"application/xml");
+    setXmlCell(doc,"A1","");setXmlCell(doc,"A2",topLine(d));setXmlCell(doc,"A3",[[d.weather?`Weather: ${d.weather}`:"",d.umpires?`Umpires: ${d.umpires}`:""].filter(Boolean).join(" • "),[d.broadcast?`TV: ${d.broadcast}`:"",d.radio?`Radio: ${d.radio}`:""].filter(Boolean).join(" • ")].filter(Boolean).join("\n"));
+    setXmlCell(doc,"J3","□ Replay Challenge □");setXmlCell(doc,"J4",`ABS\nAway: ${d.awayTeam||"Away"}  □ □ EI□`);setXmlCell(doc,"M4",`ABS\nHome: ${d.homeTeam||"Home"}  □ □ EI□`);setXmlCell(doc,"A6",`Away: ${d.awayTeam||"Away"}`);setXmlCell(doc,"A7",`Home: ${d.homeTeam||"Home"}`);
+    setXmlCell(doc,"A9",`Away: ${d.awayTeam||"Away"}${d.awayRecord?` (${d.awayRecord})`:""}`);setXmlCell(doc,"A21",`Home: ${d.homeTeam||"Home"}${d.homeRecord?` (${d.homeRecord})`:""}`);setXmlCell(doc,"A33",`Away: ${d.awayTeam||"Away"} Pitching`);setXmlCell(doc,"A41",`Home: ${d.homeTeam||"Home"} Pitching`);setXmlCell(doc,"J33",exportNotes(d,t));
+    for(const [team,rowStart] of [["away",11],["home",23]]){
+      const stats=computeTeamStats(team);for(let i=0;i<LINEUP_ROWS;i++){const row=rowStart+i;setXmlCell(doc,`A${row}`,formatLineupPlayer(d[team].lineup[i]||{}));for(let inning=1;inning<=10;inning++){const plays=playsByBatterInning(team,i,inning);setXmlCell(doc,`${columnLetter(inning+1)}${row}`,plays.length?plays.map(playNotation).join(" / "):"+");}setXmlCell(doc,`L${row}`,stats[i].ab,"number");setXmlCell(doc,`M${row}`,stats[i].r,"number");setXmlCell(doc,`N${row}`,stats[i].h,"number");setXmlCell(doc,`O${row}`,stats[i].rbi,"number");}
     }
-
-    logExport("Scorecard check passed. Required areas are present.");
-    setStatus("Scorecard check passed. The required areas are present.");
-  } catch (error) {
-    logExport(`Template check failed: ${error.message}`);
-    setStatus(error.message, true);
-    alert(error.message);
-  }
+    for(const [team,rowStart] of [["away",35],["home",43]])for(let i=0;i<PITCHER_ROWS;i++)setXmlCell(doc,`A${rowStart+i}`,formatPitcher(d[team].pitchers[i]||{}));
+    for(let inning=1;inning<=10;inning++){setXmlCell(doc,`${columnLetter(inning+1)}6`,t.away.innings[inning-1]||0,"number");setXmlCell(doc,`${columnLetter(inning+1)}7`,t.home.innings[inning-1]||0,"number");}
+    [["M6",t.away.runs],["N6",t.away.hits],["O6",t.away.errors],["M7",t.home.runs],["N7",t.home.hits],["O7",t.home.errors]].forEach(([r,v])=>setXmlCell(doc,r,v,"number"));
+    for(let row=1;row<=48;row++)setXmlCell(doc,`AA${row}`,"");
+    zip.file(path,new XMLSerializer().serializeToString(doc));const blob=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6},mimeType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});downloadBlob(blob,`${safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"scorecard"}`)}.xlsx`);$("autosaveBar").textContent="Excel scorecard downloaded.";
+  }catch(err){console.error(err);alert(`Excel export failed: ${err.message}`);}
 }
-
-
-function baseballDataApi() {
-  return window.BaseballData || window.MLBData || null;
+function buildPrintTeam(team,rowLabel){
+  const d=collectData(),stats=computeTeamStats(team);let h=`<div class="print-section"><div class="team-title">${escapeHtml(rowLabel)}: ${escapeHtml(d[`${team}Team`]||team)}</div><table><thead><tr><th class="player-col">Player / No.</th>`;for(let i=1;i<=10;i++)h+=`<th>${i}</th>`;h+=`<th class="tot">AB</th><th class="tot">R</th><th class="tot">H</th><th class="tot">RBI</th></tr></thead><tbody>`;
+  d[team].lineup.forEach((p,idx)=>{h+=`<tr><td class="player-col">${escapeHtml(formatLineupPlayer(p))}</td>`;for(let inn=1;inn<=10;inn++){const plays=playsByBatterInning(team,idx,inn);h+=`<td class="score-box">${escapeHtml(plays.length?plays.map(playNotation).join(" / "):"+")}</td>`;}const s=stats[idx];h+=`<td>${s.ab}</td><td>${s.r}</td><td>${s.h}</td><td>${s.rbi}</td></tr>`;});return h+`</tbody></table></div>`;
 }
-
-function selectedScheduleLevel() {
-  const api = baseballDataApi();
-  const key = $("scheduleLevel")?.value || "mlb";
-  return api?.getLevelConfig ? api.getLevelConfig(key) : { key, label: "Baseball", shortLabel: "baseball", sportIds: [1] };
+function renderPrintScorecard(){
+  const d=collectData(),t=computeGameTotals(),log=[...scoring.plays].sort((a,b)=>a.seq-b.seq).slice(-18).map(p=>`${p.half==="top"?"T":"B"}${p.inning} ${p.playerName}: ${playNotation(p)}`).join(" • ");
+  $("printScorecard").innerHTML=`<div class="print-header"><h1>${escapeHtml(d.awayTeam||"Away")} at ${escapeHtml(d.homeTeam||"Home")}</h1><p>${escapeHtml(topLine(d))}</p></div><div class="print-info"><div>${escapeHtml([d.weather?`Weather: ${d.weather}`:"",d.umpires?`Umpires: ${d.umpires}`:""].filter(Boolean).join(" • "))}</div><div>${escapeHtml([d.broadcast?`TV: ${d.broadcast}`:"",d.radio?`Radio: ${d.radio}`:""].filter(Boolean).join(" • "))}</div></div>${renderLineScoreTable()}${buildPrintTeam("away","Away")}${buildPrintTeam("home","Home")}<div class="print-bottom"><div class="print-notes"><h3>Game Notes</h3>${escapeHtml(d.gameNotes||"").replace(/\n/g,"<br>")}</div><div class="print-log"><h3>Play Log</h3>${escapeHtml(log)}</div></div>`;
 }
-
-function setLookupStatus(message, isError = false) {
-  const status = $("lookupStatus");
-  if (!status) return;
-  status.textContent = message;
-  status.classList.toggle("error", isError);
-  status.classList.toggle("success", !isError && !/^Loading|^Select|^Ready/.test(message));
+function printPdf(){renderPrintScorecard();setTimeout(()=>window.print(),60);}
+async function downloadBlank(){
+  try{
+    const zip=await JSZip.loadAsync(getTemplateArrayBuffer()),path="xl/worksheets/sheet1.xml",xml=await zip.file(path).async("text"),doc=new DOMParser().parseFromString(xml,"application/xml");
+    ["A1","A2","A3","J4","M4","A6","A7","A9","A21","A33","A41"].forEach(ref=>setXmlCell(doc,ref,""));
+    setXmlCell(doc,"J3","□ Replay Challenge □");setXmlCell(doc,"J33","Game Notes");
+    for(let col=2;col<=15;col++){setXmlCell(doc,`${columnLetter(col)}6`,"");setXmlCell(doc,`${columnLetter(col)}7`,"");}
+    for(const rowStart of [11,23])for(let i=0;i<LINEUP_ROWS;i++){const row=rowStart+i;setXmlCell(doc,`A${row}`,"");for(let inning=1;inning<=10;inning++)setXmlCell(doc,`${columnLetter(inning+1)}${row}`,"+");for(const col of ["L","M","N","O"])setXmlCell(doc,`${col}${row}`,"");}
+    for(const rowStart of [35,43])for(let i=0;i<PITCHER_ROWS;i++)for(let col=1;col<=8;col++)setXmlCell(doc,`${columnLetter(col)}${rowStart+i}`,"");
+    for(let row=1;row<=48;row++)setXmlCell(doc,`AA${row}`,"");
+    zip.file(path,new XMLSerializer().serializeToString(doc));
+    const blob=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6},mimeType:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    downloadBlob(blob,uploadedTemplateName||TEMPLATE_FILE_NAME);
+  }catch(err){console.error(err);alert(`Blank scorecard download failed: ${err.message}`);}
 }
+async function uploadTemplate(file){try{uploadedTemplateBuffer=await file.arrayBuffer();uploadedTemplateName=file.name;$("templateStatus").textContent=`Using uploaded template: ${file.name}`;}catch(err){uploadedTemplateBuffer=null;uploadedTemplateName="";$("templateStatus").textContent="The uploaded template could not be read.";}}
 
-function formatScheduleDateLabel(dateValue) {
-  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue || "");
-  if (!parts) return dateValue || "the selected date";
-  const date = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  }).format(date);
+
+
+// Version 21 retains the restored Version 8–10 classic layout and uses the approved burnt orange, brown, gold, yellow, and cream PDF palette.
+const CLASSIC_PDF_WIDTH=612, CLASSIC_PDF_HEIGHT=792;
+let classicPdfMeasureContext=null;
+function classicPdfSanitize(value){return String(value??"").replace(/\u00a0/g," ").replace(/[\u2018\u2019]/g,"'").replace(/[\u201c\u201d]/g,'"').replace(/[\u2013\u2014]/g," - ").replace(/\u2022/g," - ").replace(/\u2026/g,"...").replace(/[\u25a1\u2610]/g,"").replace(/[^\x09\x0A\x0D\x20-\xFF]/g,"?");}
+function classicPdfCtx(){if(!classicPdfMeasureContext){const c=document.createElement("canvas");classicPdfMeasureContext=c.getContext("2d");}return classicPdfMeasureContext;}
+function classicPdfMeasure(text,size,bold=false){const c=classicPdfCtx();c.font=`${bold?700:400} ${size}px Arial`;return c.measureText(classicPdfSanitize(text)).width;}
+function classicPdfFit(text,width,size,min,bold=false){while(size>min&&classicPdfMeasure(text,size,bold)>width)size-=.25;return Math.max(min,size);}
+function classicPdfHex(value){let h="";for(const ch of classicPdfSanitize(value)){const n=ch.charCodeAt(0);h+=(n<=255?n:63).toString(16).padStart(2,"0").toUpperCase();}return `<${h}>`;}
+function classicPdfColor(c){if(c==="white"||c==="cream")return "1 .973 .914";if(c==="yellow")return ".984 .914 .722";if(c==="gold")return ".851 .643 .255";if(c==="orange")return ".608 .302 .122";if(c==="brown")return ".239 .145 .098";return ".184 .141 .118";}
+function classicPdfText(cmd,value,x,top,width,size,opt={}){const text=classicPdfSanitize(value).trim();if(!text)return;const bold=opt.bold!==false;size=classicPdfFit(text,width,size,opt.minSize||4.2,bold);const w=classicPdfMeasure(text,size,bold);let dx=x;if(opt.align==="center")dx=x+Math.max(0,(width-w)/2);if(opt.align==="right")dx=x+Math.max(0,width-w);const y=CLASSIC_PDF_HEIGHT-top-size*.95;cmd.push(`BT /${bold?"F2":"F1"} ${size.toFixed(2)} Tf ${classicPdfColor(opt.color)} rg 1 0 0 1 ${dx.toFixed(2)} ${y.toFixed(2)} Tm ${classicPdfHex(text)} Tj ET`);}
+function classicPdfWrap(text,width,size,bold=false){const out=[];for(const para of classicPdfSanitize(text).split(/\r?\n/)){const words=para.trim().split(/\s+/).filter(Boolean);if(!words.length){out.push("");continue;}let line="";for(const word of words){const test=line?`${line} ${word}`:word;if(!line||classicPdfMeasure(test,size,bold)<=width)line=test;else{out.push(line);line=word;}}if(line)out.push(line);}return out;}
+function classicPdfNotes(cmd,text){
+  const clean=classicPdfSanitize(text).replace(/^Game Notes\s*/i,"").trim();
+  if(!clean)return;
+  let size=7.2,lineHeight=8.4,lines=classicPdfWrap(clean,166,size,false);
+  const maxHeight=168;
+  while(lines.length*lineHeight>maxHeight&&size>5.2){size-=.25;lineHeight=size*1.18;lines=classicPdfWrap(clean,166,size,false);}
+  lines.slice(0,Math.floor(maxHeight/lineHeight)).forEach((line,i)=>classicPdfText(cmd,line,423,617+i*lineHeight,166,size,{bold:false,minSize:size,color:"brown"}));
 }
-
-function setScheduleLoading(isLoading) {
-  const select = $("dailyGameSelect");
-  const lookupButton = $("lookupGameBtn");
-  const refreshButton = $("refreshGamesBtn");
-  if (select) select.disabled = isLoading;
-  if (lookupButton) lookupButton.disabled = isLoading || !select?.value;
-  if (refreshButton) refreshButton.disabled = isLoading;
+function classicPdfOverlay(){
+  const d=collectData(),totals=computeGameTotals(),cmd=["q 612 0 0 792 0 0 cm /Im0 Do Q"];
+  classicPdfText(cmd,topLine(d),21.4,5.0,395,9.4,{minSize:5.8,color:"brown"});
+  const info=[[d.weather?`Weather: ${d.weather}`:"",d.umpires?`Umpires: ${d.umpires}`:""].filter(Boolean).join(" • "),[d.broadcast?`TV: ${d.broadcast}`:"",d.radio?`Radio: ${d.radio}`:""].filter(Boolean).join(" • ")].filter(Boolean);
+  info.slice(0,2).forEach((line,i)=>classicPdfText(cmd,line,21.4,22+i*12,395,8.8,{minSize:5,color:"brown"}));
+  classicPdfText(cmd,`ABS  Away: ${d.awayTeam||"Away"}`,424,51,80,6.1,{minSize:4.2,color:"white",align:"center"});
+  classicPdfText(cmd,`ABS  Home: ${d.homeTeam||"Home"}`,506,51,84,6.1,{minSize:4.2,color:"white",align:"center"});
+  const scoreTops={away:88.3,home:105.6};
+  classicPdfText(cmd,`Away: ${d.awayTeam||"Away"}`,21.4,scoreTops.away,178,10.2,{minSize:6.2,color:"white"});
+  classicPdfText(cmd,`Home: ${d.homeTeam||"Home"}`,21.4,scoreTops.home,178,10.2,{minSize:6.2,color:"white"});
+  const inningX=i=>196.8+(i-1)*28.55;
+  for(let i=1;i<=10;i++){classicPdfText(cmd,totals.away.innings[i-1]||0,inningX(i),scoreTops.away,28.5,8,{align:"center",color:"brown"});classicPdfText(cmd,totals.home.innings[i-1]||0,inningX(i),scoreTops.home,28.5,8,{align:"center",color:"brown"});}
+  [["away",scoreTops.away],["home",scoreTops.home]].forEach(([team,top])=>{classicPdfText(cmd,totals[team].runs,520,top,27,8,{align:"center",color:"brown"});classicPdfText(cmd,totals[team].hits,548.5,top,27,8,{align:"center",color:"brown"});classicPdfText(cmd,totals[team].errors,577,top,27,8,{align:"center",color:"brown"});});
+  const awayTitle=`Away: ${d.awayTeam||"Away"}${d.awayRecord?` (${d.awayRecord})`:""}`,homeTitle=`Home: ${d.homeTeam||"Home"}${d.homeRecord?` (${d.homeRecord})`:""}`;
+  classicPdfText(cmd,awayTitle,21.4,128.0,395,10.3,{minSize:5.5,color:"white"});classicPdfText(cmd,homeTitle,21.4,364.6,395,10.3,{minSize:5.5,color:"white"});
+  const rowTops={away:[161.7,184.1,205.8,227.6,249.3,271.7,293.5,315.2,336.9],home:[398.2,420.0,441.7,463.4,485.1,507.6,529.3,551.0,572.7]};
+  for(const team of ["away","home"]){const stats=computeTeamStats(team);d[team].lineup.forEach((p,r)=>{const top=rowTops[team][r];classicPdfText(cmd,formatLineupPlayer(p),21.4,top,178,8.7,{minSize:4.7,color:"brown"});for(let inn=1;inn<=10;inn++){const plays=playsByBatterInning(team,r,inn),notation=plays.length?plays.map(playNotation).join("/"):"";if(notation)classicPdfText(cmd,notation,inningX(inn)+1,top-1,26.5,5.2,{minSize:3.8,align:"center",color:"brown"});}const xs=[482,511,540,569];[stats[r].ab,stats[r].r,stats[r].h,stats[r].rbi].forEach((v,j)=>classicPdfText(cmd,v,xs[j],top,27,7.5,{align:"center",color:"brown"}));});}
+  classicPdfText(cmd,`Away: ${d.awayTeam||"Away"} Pitching`,21.4,599.7,395,9.2,{minSize:4.8,color:"white"});classicPdfText(cmd,`Home: ${d.homeTeam||"Home"} Pitching`,21.4,697.7,395,9.2,{minSize:4.8,color:"white"});
+  const pTops={away:[625.7,637.8,649.8,661.8,673.7,685.8],home:[723.2,735.1,747.1,759.1,771.0,781.0]};for(const team of ["away","home"])d[team].pitchers.forEach((p,i)=>classicPdfText(cmd,formatPitcher(p),21.4,pTops[team][i],178,7.2,{minSize:4.2,color:"brown"}));
+  classicPdfNotes(cmd,exportNotes(d,totals));return `${cmd.join("\n")}\n`;
 }
+function classicPdfBytes(){if(typeof EMBEDDED_SCORECARD_BACKGROUND_JPEG_BASE64==="undefined")throw new Error("Classic scorecard PDF background is missing.");const image=new Uint8Array(base64ToArrayBuffer(EMBEDDED_SCORECARD_BACKGROUND_JPEG_BASE64)),content=new TextEncoder().encode(classicPdfOverlay()),parts=[],offsets=Array(8).fill(0);let length=0;const push=b=>{parts.push(b);length+=b.length;},txt=t=>push(new TextEncoder().encode(t)),obj=(n,b)=>{offsets[n]=length;txt(`${n} 0 obj\n`);b.forEach(push);txt("\nendobj\n");};txt("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");obj(1,[new TextEncoder().encode("<< /Type /Catalog /Pages 2 0 R >>")]);obj(2,[new TextEncoder().encode("<< /Type /Pages /Kids [3 0 R] /Count 1 >>")]);obj(3,[new TextEncoder().encode("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> /XObject << /Im0 6 0 R >> >> /Contents 7 0 R >>")]);obj(4,[new TextEncoder().encode("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")]);obj(5,[new TextEncoder().encode("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")]);offsets[6]=length;txt(`6 0 obj\n<< /Type /XObject /Subtype /Image /Width ${EMBEDDED_SCORECARD_BACKGROUND_WIDTH} /Height ${EMBEDDED_SCORECARD_BACKGROUND_HEIGHT} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.length} >>\nstream\n`);push(image);txt("\nendstream\nendobj\n");offsets[7]=length;txt(`7 0 obj\n<< /Length ${content.length} >>\nstream\n`);push(content);txt("endstream\nendobj\n");const xref=length;txt("xref\n0 8\n0000000000 65535 f \n");for(let i=1;i<=7;i++)txt(`${String(offsets[i]).padStart(10,"0")} 00000 n \n`);txt(`trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);const out=new Uint8Array(length);let pos=0;for(const p of parts){out.set(p,pos);pos+=p.length;}return out;}
+function exportClassicPdf(){try{const d=collectData(),bytes=classicPdfBytes();downloadBlob(new Blob([bytes],{type:"application/pdf"}),`${safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"scorecard"}`)}.pdf`);$("autosaveBar").textContent="Classic-layout PDF scorecard downloaded.";}catch(err){console.error(err);alert(`PDF export failed: ${err.message}`);}}
 
-async function loadDailyGames() {
-  const select = $("dailyGameSelect");
-  const dateInput = $("lookupDate");
-  const levelInput = $("scheduleLevel");
-  if (!select || !dateInput || !levelInput) return;
-
-  const api = baseballDataApi();
-  if (!api) {
-    select.innerHTML = '<option value="">Online schedule unavailable</option>';
-    select.disabled = true;
-    setLookupStatus("The online lookup component did not load. Manual entry is still available.", true);
-    return;
-  }
-
-  const requestToken = ++scheduleRequestToken;
-  const today = api.easternToday();
-  dateInput.min = today;
-  if (!dateInput.value || dateInput.value < today) dateInput.value = today;
-  const date = dateInput.value;
-  const levelKey = levelInput.value || "mlb";
-  const level = api.getLevelConfig(levelKey);
-  const dateLabel = formatScheduleDateLabel(date);
-
-  select.innerHTML = '<option value="">Loading scheduled games…</option>';
-  select.value = "";
-  setScheduleLoading(true);
-  levelInput.disabled = true;
-  setLookupStatus(`Loading ${level.label} games for ${dateLabel}…`);
-
-  try {
-    const games = await api.listGames(date, levelKey);
-    if (requestToken !== scheduleRequestToken) return;
-
-    select.innerHTML = "";
-    if (!games.length) {
-      const option = document.createElement("option");
-      option.value = "";
-      option.textContent = `No ${level.label} games scheduled`;
-      select.appendChild(option);
-      select.disabled = true;
-      $("lookupGameBtn").disabled = true;
-      setLookupStatus(`No ${level.label} games are scheduled for ${dateLabel}. Choose another date or level, or use manual entry.`);
-      return;
-    }
-
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = `Select one of ${games.length} scheduled game${games.length === 1 ? "" : "s"}`;
-    select.appendChild(placeholder);
-
-    const addGameOption = (parent, game) => {
-      const option = document.createElement("option");
-      option.value = String(game.gamePk);
-      option.textContent = game.label;
-      option.dataset.awayTeam = game.awayTeam;
-      option.dataset.homeTeam = game.homeTeam;
-      option.dataset.status = game.status;
-      option.dataset.sportId = String(game.sportId || "");
-      option.dataset.levelName = game.levelName || "Baseball";
-      option.dataset.sourceName = game.sourceName || game.levelName || "Baseball";
-      parent.appendChild(option);
-    };
-
-    if (level.sportIds.length > 1) {
-      const groups = new Map();
-      games.forEach((game) => {
-        const groupName = game.levelName || "Baseball";
-        if (!groups.has(groupName)) {
-          const group = document.createElement("optgroup");
-          group.label = `${groupName} — ${games.filter((item) => item.levelName === groupName).length} game${games.filter((item) => item.levelName === groupName).length === 1 ? "" : "s"}`;
-          groups.set(groupName, group);
-          select.appendChild(group);
-        }
-        addGameOption(groups.get(groupName), game);
-      });
-    } else {
-      games.forEach((game) => addGameOption(select, game));
-    }
-
-    select.disabled = false;
-    $("lookupGameBtn").disabled = true;
-    setLookupStatus(`${games.length} ${level.shortLabel} game${games.length === 1 ? "" : "s"} found for ${dateLabel}. Select a matchup from the list.`);
-  } catch (error) {
-    if (requestToken !== scheduleRequestToken) return;
-    console.error(error);
-    select.innerHTML = '<option value="">Could not load schedule</option>';
-    select.disabled = true;
-    $("lookupGameBtn").disabled = true;
-    setLookupStatus(`${error.message} Manual entry is still available.`, true);
-    setStatus(error.message, true);
-    logExport(`Schedule lookup error: ${error.message}`);
-  } finally {
-    if (requestToken === scheduleRequestToken) {
-      $("refreshGamesBtn").disabled = false;
-      levelInput.disabled = false;
-    }
-  }
+function initEvents(){
+  document.querySelectorAll(".step").forEach(b=>b.addEventListener("click",()=>setPanel(b.dataset.panel)));document.querySelectorAll(".next-panel").forEach(b=>b.addEventListener("click",()=>setPanel(b.dataset.next)));
+  document.addEventListener("input",e=>{if(e.target.matches("input,textarea,select")&&!e.target.closest("#playDialog")){refreshHeadings();scheduleAutosave();}});
+  $("playForm").addEventListener("submit",recordPlay);$("playOutcome").addEventListener("change",()=>{const team=$("dialogTeam").value,idx=num($("dialogPlayerIndex").value),def=defaultDetails($("playOutcome").value,team,idx).d;$("playRuns").value=def.runs;$("playRbi").value=def.rbi;$("playOuts").value=def.outs;$("playErrors").value=def.errors;$("batterDestination").value=def.batter;$("runner1Destination").value=def.r1;$("runner2Destination").value=def.r2;$("runner3Destination").value=def.r3;});
+  $("deletePlayBtn").addEventListener("click",()=>{const id=$("dialogPlayId").value;if(id&&confirm("Delete this play?")){deletePlay(id);$("playDialog").close();}});
+  $("undoBtn").addEventListener("click",undoLastPlay);$("manualHalfBtn").addEventListener("click",manualChangeHalf);$("resetScoringBtn").addEventListener("click",resetScoring);
+  $("ballBtn").addEventListener("click",()=>addPitch("ball"));$("strikeBtn").addEventListener("click",()=>addPitch("strike"));$("foulBtn").addEventListener("click",()=>addPitch("foul"));$("inPlayBtn").addEventListener("click",()=>addPitch("inplay"));
+  $("undoPitchBtn").addEventListener("click",undoPitch);$("resetCountBtn").addEventListener("click",()=>resetCurrentCount());$("toggleQuickResultsBtn").addEventListener("click",toggleQuickResults);
+  $("quickResultGrid").addEventListener("click",event=>{const button=event.target.closest("[data-quick-outcome]");if(button)handleQuickOutcome(button.dataset.quickOutcome);});
+  $("strikeoutChooser").addEventListener("click",event=>{const button=event.target.closest("[data-terminal-outcome]");if(button)handleTerminalStrikeout(button.dataset.terminalOutcome);});
+  document.addEventListener("keydown",handleScoringKeyboard);
+  $("refreshGamesBtn").addEventListener("click",refreshScheduleAndClear);$("dailyGameSelect").addEventListener("change",()=>$("lookupGameBtn").disabled=!$("dailyGameSelect").value);$("lookupGameBtn").addEventListener("click",loadSelectedGame);$("clearForManualBtn").addEventListener("click",clearForManual);
+  ["exportExcelBtn","exportExcelBtn2"].forEach(id=>$(id).addEventListener("click",exportExcel));["printPdfBtn","printPdfBtn2"].forEach(id=>$(id).addEventListener("click",exportClassicPdf));["saveGameFileBtn","saveGameFileBtn2"].forEach(id=>$(id).addEventListener("click",saveGameFile));
+  ["openGameFile","openGameFile2"].forEach(id=>$(id).addEventListener("change",e=>{if(e.target.files[0])openGameFile(e.target.files[0]);e.target.value="";}));$("templateFile").addEventListener("change",e=>{if(e.target.files[0])uploadTemplate(e.target.files[0]);});$("downloadBlankBtn").addEventListener("click",downloadBlank);
+  $("lookupDate").addEventListener("change",loadSchedule);$("scheduleLevel").addEventListener("change",loadSchedule);
+  window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;$("installBtn").hidden=false;});$("installBtn").addEventListener("click",async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;$("installBtn").hidden=true;});
 }
-
-function handleGameSelection() {
-  const select = $("dailyGameSelect");
-  const button = $("lookupGameBtn");
-  if (!select || !button) return;
-
-  button.disabled = !select.value;
-  if (!select.value) {
-    setLookupStatus("Select a game from the schedule.");
-    return;
-  }
-
-  const option = select.options[select.selectedIndex];
-  const matchup = `${option.dataset.awayTeam || "Away Team"} at ${option.dataset.homeTeam || "Home Team"}`;
-  const level = option.dataset.levelName ? `${option.dataset.levelName}: ` : "";
-  const status = option.dataset.status && option.dataset.status !== "Scheduled" ? ` (${option.dataset.status})` : "";
-  setLookupStatus(`${level}${matchup}${status} selected. Choose Fill Scorecard to load the available game information.`);
+function disableBrowserFormRestore(){
+  document.querySelectorAll("input:not([type=file]):not([type=hidden]), textarea").forEach(field=>{
+    field.setAttribute("autocomplete","off");
+    field.setAttribute("autocapitalize",field.type==="text"?"words":"off");
+  });
+  document.querySelectorAll("form").forEach(form=>form.setAttribute("autocomplete","off"));
 }
-
-function showImportBanner(meta, data) {
-  const banner = $("importBanner");
-  if (!banner) return;
-  if (!meta) {
-    banner.hidden = true;
-    return;
-  }
-
-  const lineupText = meta.lineupCount === 18
-    ? "Both starting lineups were loaded."
-    : `${meta.lineupCount} of 18 lineup positions were available.`;
-  const warningText = meta.warnings?.length ? ` ${meta.warnings.join(" ")}` : "";
-  $("importBannerTitle").textContent = `${data.awayTeam} at ${data.homeTeam} loaded from ${meta.sourceName || "online baseball data"}`;
-  $("importBannerText").textContent = `${lineupText} Review and edit every field before creating the scorecard.${warningText}`;
-  banner.hidden = false;
+function initializeBlankStartup(){
+  clearPersistentGameData();
+  scoring=initialScoring();
+  setFieldsFromData({});
+  const today=globalThis.BaseballData?.localDateISO?.("America/New_York") || new Date().toISOString().slice(0,10);
+  setField("lookupDate",today);
+  setField("scheduleLevel","mlb");
+  refreshAll();
+  setPanel("setup");
+  if($("autosaveBar")) $("autosaveBar").textContent="Blank game ready. Use Save Game File to preserve a game.";
 }
-
-function startManualEntry() {
-  clearForm(false);
-  if ($("importBanner")) $("importBanner").hidden = true;
-  setStatus("Manual entry mode. Enter the game information, lineups, pitchers, and notes.");
-  showStep("game");
-}
-
-async function lookupSelectedGame() {
-  const select = $("dailyGameSelect");
-  const gamePk = select?.value;
-  const button = $("lookupGameBtn");
-
-  const api = baseballDataApi();
-  if (!api) {
-    setLookupStatus("The online lookup component did not load.", true);
-    return;
-  }
-  if (!gamePk) {
-    setLookupStatus("Select a game from the schedule.", true);
-    return;
-  }
-
-  const selectedOption = select.options[select.selectedIndex];
-  const matchup = `${selectedOption.dataset.awayTeam || "Away Team"} at ${selectedOption.dataset.homeTeam || "Home Team"}`;
-  const sportId = selectedOption.dataset.sportId || "";
-  const sourceName = selectedOption.dataset.sourceName || selectedOption.dataset.levelName || "baseball";
-
-  button.disabled = true;
-  button.textContent = "Loading Selected Game…";
-  select.disabled = true;
-  $("refreshGamesBtn").disabled = true;
-  setLookupStatus(`Loading ${matchup}…`);
-  setStatus(`Loading official ${sourceName} game information…`);
-
-  try {
-    const result = await api.lookupGameByPk(gamePk, sportId);
-    setFieldsFromData(result.data);
-    showImportBanner(result.meta, result.data);
-
-    const missingText = result.meta.warnings.length
-      ? ` ${result.meta.warnings.join(" ")}`
-      : " All commonly available pregame fields were loaded.";
-    setLookupStatus(`${result.data.awayTeam} at ${result.data.homeTeam} was loaded.${missingText}`);
-    setStatus("Online game information loaded. Review each section and add or correct anything needed.");
-    logExport(`Loaded ${result.meta.sourceName || sourceName} game ${result.meta.gamePk}: ${result.data.awayTeam} at ${result.data.homeTeam}.`);
-    showStep("game");
-  } catch (error) {
-    console.error(error);
-    setLookupStatus(error.message, true);
-    setStatus(error.message, true);
-    logExport(`Online lookup error: ${error.message}`);
-  } finally {
-    button.textContent = "Fill Scorecard from Selected Game";
-    select.disabled = false;
-    $("refreshGamesBtn").disabled = false;
-    button.disabled = !select.value;
-  }
-}
-
-function saveDraft() {
-  localStorage.setItem("scorecard20260615Draft", JSON.stringify(collectData()));
-  setStatus("Draft saved in this browser. The app will still open blank unless you choose Load Draft.");
-  logExport("Draft saved locally.");
-}
-
-function loadDraft() {
-  const raw = localStorage.getItem("scorecard20260615Draft");
-  if (!raw) {
-    setStatus("No saved draft found.", true);
-    return;
-  }
-  try {
-    clearForm(false);
-    setFieldsFromData(JSON.parse(raw));
-    setStatus("Draft loaded.");
-    logExport("Draft loaded locally.");
-  } catch (error) {
-    setStatus("Could not load draft.", true);
-    logExport(`Draft load error: ${error.message}`);
-  }
-}
-
-function clearForm(confirmFirst = true) {
-  if (confirmFirst && !confirm("Clear every scorecard field?")) return;
-  const scorecardIds = [
-    "awayTeam", "homeTeam", "awayRecord", "homeRecord", "gameDate", "gameTime", "venue",
-    "gameNumber", "weather", "umpires", "broadcast", "radio", "gameNotes"
-  ];
-  scorecardIds.forEach((id) => setField(id, ""));
-  ["away", "home"].forEach((team) => {
-    for (let i = 1; i <= LINEUP_ROWS; i++) {
-      ["Num", "Player", "Pos", "Bats", "Avg", "Obp"].forEach((field) => setField(`${team}${field}${i}`, ""));
-    }
-    for (let i = 1; i <= PITCHER_ROWS; i++) {
-      ["PitcherNum", "Pitcher", "PitcherThrows", "PitcherRecord", "PitcherEra", "PitcherK"].forEach((field) => setField(`${team}${field}${i}`, ""));
+function init(){
+  createLineupInputs("away");createLineupInputs("home");createPitcherInputs("away");createPitcherInputs("home");
+  disableBrowserFormRestore();
+  renderQuickResults();
+  initEvents();
+  initializeBlankStartup();
+  loadSchedule();
+  window.addEventListener("pageshow",event=>{
+    if(event.persisted){
+      initializeBlankStartup();
+      loadSchedule();
     }
   });
-  if ($("importBanner")) $("importBanner").hidden = true;
-  setStatus("Form cleared. Creating now would download a blank scorecard.");
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=21",{updateViaCache:"none"}).catch(console.warn);
 }
-
-function logExport(message) {
-  const now = new Date().toLocaleTimeString();
-  if ($("exportLog")) $("exportLog").textContent = `[${now}] ${message}\n\n${$("exportLog").textContent}`;
-}
-
-function setStatus(message, isError = false) {
-  const status = $("statusBox");
-  if (!status) return;
-  status.textContent = message;
-  status.style.borderColor = isError ? "#b91c1c" : "#cbd5e1";
-  status.style.background = isError ? "#fef2f2" : "#f8fafc";
-}
-
-function showStep(stepId) {
-  document.querySelectorAll(".panel:not(.notice-panel)").forEach((panel) => panel.classList.remove("active"));
-  const target = $(stepId);
-  if (!target) return;
-  target.classList.add("active");
-  document.querySelectorAll(".step").forEach((step) => step.classList.toggle("active", step.dataset.step === stepId));
-  window.scrollTo({ top: 0, behavior: "smooth" });
-}
-
-function init() {
-  createLineupInputs("away");
-  createLineupInputs("home");
-  createPitcherInputs("away");
-  createPitcherInputs("home");
-
-  const api = baseballDataApi();
-  if ($("lookupDate") && api) {
-    const today = api.easternToday();
-    $("lookupDate").value = today;
-    $("lookupDate").min = today;
-  }
-
-  document.querySelectorAll(".step").forEach((button) => button.addEventListener("click", () => showStep(button.dataset.step)));
-  document.querySelectorAll(".nextBtn").forEach((button) => button.addEventListener("click", () => showStep(button.dataset.next)));
-  $("lookupGameBtn")?.addEventListener("click", lookupSelectedGame);
-  $("dailyGameSelect")?.addEventListener("change", handleGameSelection);
-  $("lookupDate")?.addEventListener("change", loadDailyGames);
-  $("scheduleLevel")?.addEventListener("change", loadDailyGames);
-  $("refreshGamesBtn")?.addEventListener("click", loadDailyGames);
-  $("manualEntryBtn")?.addEventListener("click", startManualEntry);
-  $("downloadBlankBtn").addEventListener("click", downloadBlankTemplate);
-  $("downloadBlankBtn2")?.addEventListener("click", downloadBlankTemplate);
-  $("exportExcelBtn").addEventListener("click", exportFilledExcel);
-  $("exportExcelBtn2").addEventListener("click", exportFilledExcel);
-  $("exportPdfBtn")?.addEventListener("click", exportFilledPdf);
-  $("exportPdfBtn2")?.addEventListener("click", exportFilledPdf);
-  $("saveDraftBtn").addEventListener("click", saveDraft);
-  $("loadDraftBtn").addEventListener("click", loadDraft);
-  $("clearBtn").addEventListener("click", () => clearForm(true));
-  $("templateFile").addEventListener("change", handleTemplateUpload);
-  $("validateTemplateBtn").addEventListener("click", validateTemplate);
-
-  // Important: do not auto-load old localStorage drafts. The app always opens at the choice screen.
-  clearForm(false);
-  setStatus("Ready. Choose a scheduled MLB or MiLB game, or use manual entry. Download as Excel or a one-page PDF.");
-  setLookupStatus("Loading today’s official MLB schedule…");
-  showStep("start");
-  loadDailyGames();
-}
-
-document.addEventListener("DOMContentLoaded", init);
+init();
