@@ -1,17 +1,17 @@
-const CACHE = "guariglia-scorecard-v24-sharp-pdf";
+const CACHE = "guariglia-scorecard-v27-2-compact-pitcher-flow";
 const CORE_ASSETS = [
-  "/styles.css?v=24-sharp-pdf",
-  "/app.js?v=24-sharp-pdf",
-  "/baseball-data.js?v=24",
+  "/styles.css?v=27.2-compact-pitcher-flow",
+  "/app.js?v=27.2-compact-pitcher-flow",
+  "/baseball-data.js?v=27.2",
   "/template_data.js",
-  "/pdf_background_data.js?v=24-sharp-pdf",
+  "/pdf_background_data.js?v=27.2",
   "/vendor/jszip.min.js",
   "/assets/guariglia-crest.gif",
   "/assets/icon-192.png",
   "/assets/icon-512.png",
   "/assets/Scorecard_20260615_blank_template.xlsx",
   "/assets/Scorecard_20260615_App_Colors_Classic_Blank.xlsx",
-  "/assets/classic-scorecard-background.jpg?v=24-sharp-pdf",
+  "/assets/classic-scorecard-background.jpg?v=27.2-compact-pitcher-flow",
   "/manifest.webmanifest"
 ];
 

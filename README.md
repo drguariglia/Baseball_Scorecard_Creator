@@ -1,15 +1,84 @@
-# Guariglia Baseball Scorecard Builder - Version 24
+# Guariglia Baseball Scorecard Builder — Version 26.1
 
-Version 24 is built from the deployed Version 23 baseline. It preserves the existing scoring workflow, MLB home-team color palettes, optional blank-PDF guides, and the exact one-page classic PDF geometry.
+Version 26.1 is the consolidated **Game Management Update** built from the Version 26 testing build. It retains the approved Version 24 classic PDF foundation and all Version 25/26 scoring, pitch-tracking, ABS, and live-matchup capabilities.
 
-## Version 24 changes
+## Game Notes and Key Plays
 
-- Replaced the 150-DPI PDF background with a sharpened 300-DPI background measuring 2550 x 3300 pixels.
-- Completed computer-scored PDFs now rebuild both nine-row scoring grids after removing traditional guides.
-- Every plus sign and every 2x3 ball-strike counter fragment is removed from completed PDFs, including remnants that previously remained along cell edges.
-- Vertical and horizontal scoring-box borders are redrawn cleanly after the guides are removed.
-- PDF image encoding quality was increased while retaining the same US Letter portrait page and all existing field positions.
-- Blank PDFs can still include the traditional plus signs and 2x3 counters when the user selects that option.
-- Home-team MLB color schemes, online scoring, pitch tracking, undo rebuilding, exports, and all Version 23 app behavior remain unchanged.
+- The lower-right Game Notes area begins with the final/current score.
+- Appearance notes are assembled chronologically from the first recorded plate appearance through the last.
+- Each note includes the inning, batter, at-bat result, and the note entered for that appearance.
+- A compact **Key Play** toggle prefixes the note with `KEY PLAY`, marks the scoring cell, and identifies the event in Game Notes.
+- Manual Game Notes, substitutions, pitching changes, and ABS challenge information are retained in the exported timeline.
 
-Version 23 remains the currently deployed live baseline. Version 24 is the new testing build until it is reviewed and deployed.
+## Position-Player Substitutions
+
+- Each team has a ten-player bench area with the same fields used for starters: number, name, position, bats, AVG, and OBP.
+- Each live lineup row includes a substitution dropdown.
+- Only unused available bench players appear.
+- The substitution dialog records the reason, defensive position, inning, half-inning, and optional note.
+- Starters and substitutes retain separate identities, histories, and individual batting statistics while sharing the correct batting-order slot.
+
+## Pitching Changes
+
+- Each team’s Pitching section includes an available-pitcher/reliever dropdown.
+- Every pitcher retains number, name, throwing hand, record, ERA, and strikeouts.
+- Pitchers already used are removed from the available-reliever list.
+- Pitch history, batters faced, hits, walks, strikeouts, and other totals remain separate for each pitcher.
+
+## Individual Error Assignment
+
+- A compact **Record Error** button opens an error-assignment panel for the current plate appearance.
+- The fielder dropdown lists only players currently on defense.
+- Error types include fielding, throwing, catching, dropped fly, missed catch, and other.
+- A second error can be assigned to the same play, with optional details.
+- Reached on Error requires a defensive player assignment before it can be saved.
+- Standard notation such as `E6` is generated automatically. Combined plays can display notation such as `1B/E9`.
+- Individual fielder totals and team error totals are maintained and rebuilt correctly after Undo Last Play.
+
+## Display and Control Refinements
+
+- The schedule button is labeled **Reset Card / Refresh Schedule List**.
+- A home run displays only **HR** in every at-bat box, while the underlying run and RBI statistics remain accurate.
+- Undo Last Play, Change Half-Inning, and Reset Entire Game remain beneath the scoring instructions.
+- The consolidated live matchup area continues to show current batter and pitcher data, prior batter appearances, and live pitcher statistics.
+
+## Preserved Features
+
+- MLB ABS challenge tracking
+- Permanent pitch history and pitcher totals
+- Automatic walks and swinging/looking strikeouts
+- Dropped-third-strike correction
+- Full game-state undo and rebuild
+- MLB/MiLB schedule and game-data lookup
+- Sharpened 300-DPI classic one-page PDF
+- Home-team MLB color palettes
+- Excel, PDF, saved-game, and pitch-log CSV exports
+- Optional traditional guides on blank PDFs
+
+Version 24 remains the approved production baseline until Version 27 is explicitly approved. Version 27.2 is the current testing build.
+
+
+
+## Version 27.2
+
+- Shows the starting pitcher first and adds each selected reliever beneath that starter only when used.
+- Loads every available active-roster pitcher up to the app's 15-pitcher capacity internally.
+- Keeps the probable/current pitcher identified separately.
+- Uses one compact Add Pitcher dropdown, sorted by last name and then first name, for all unused eligible pitchers.
+- Shows full pitcher information: uniform number, name, throwing hand, record, ERA, and strikeouts.
+- Removes pitchers from availability after they enter while preserving their game history and statistics.
+
+## Version 27.1
+
+- Corrects online bullpen and reliever loading by using each team’s active roster.
+- Loads the full active-roster pitching pool internally without displaying the entire bullpen at once.
+- Populates pitching-change dropdowns with all unused active pitchers and relievers.
+- Keeps PDF and Excel pitching sections limited to the starter and up to five pitchers who appeared.
+
+## Version 27
+
+- Ends regulation games correctly after the top or bottom of the ninth and immediately on a home-team walk-off.
+- Uses the MLB regular-season automatic-runner rule in extra innings: the batting-order player immediately preceding the leadoff hitter begins each half-inning on second, with a pinch-runner available through the existing substitution workflow.
+- Provides a postseason/traditional extra-inning option with empty bases.
+- Preserves innings 1–10 on PDF page 1 and automatically adds a continuation scorecard for innings 11–20 on page 2.
+- Save Game File, Download Excel, and Download PDF retain all on-screen data and then offer a deliberate, double-confirmed Clear Card option.

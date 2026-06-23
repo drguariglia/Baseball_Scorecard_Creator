@@ -1,0 +1,17 @@
+{
+  "version": "27.2",
+  "build_name": "Starter-First Add Pitcher Workflow",
+  "status": "passed",
+  "validated_at": "2026-06-23T21:05:06.260699+00:00",
+  "checks": [
+    "Full inherited automated test suite",
+    "Starter shown as the only initial visible pitcher",
+    "Unused active-roster pitchers remain alphabetized in Add Pitcher dropdown",
+    "Selected relievers are added to the visible list in appearance order",
+    "Used pitchers are removed from availability",
+    "Custom pitcher entry preserves manual-game support",
+    "JavaScript syntax validation",
+    "Unique HTML element ID validation",
+    "Service-worker cache key updated without changing displayed version number"
+  ]
+}

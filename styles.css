@@ -55,7 +55,7 @@ button:disabled{opacity:.48;cursor:not-allowed;transform:none}
 .panel p{line-height:1.5}
 .mode-grid,.lineup-input-wrap,.settings-grid,.summary-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
 .settings-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-.entry-card,.summary-card,.team-score-section,.current-batter-card,.scoring-help{background:linear-gradient(180deg,#fffdf8,#fff6e3);border:1px solid #dcc49b;border-radius:16px;padding:1rem;box-shadow:0 7px 20px rgba(83,51,25,.06)}
+.entry-card,.summary-card,.team-score-section,.scoring-help,.live-matchup-card{background:linear-gradient(180deg,#fffdf8,#fff6e3);border:1px solid #dcc49b;border-radius:16px;padding:1rem;box-shadow:0 7px 20px rgba(83,51,25,.06)}
 .form-grid{display:grid;gap:.85rem}
 .two-col{grid-template-columns:repeat(2,minmax(0,1fr))}
 .three-col{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -87,10 +87,8 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .base{position:absolute;width:20px;height:20px;border:2px solid #efd49c;background:transparent;transform:rotate(45deg);border-radius:3px}
 .base.occupied{background:var(--gold);box-shadow:0 0 12px rgba(255,210,104,.5)}
 #base2{left:26px;top:0}#base3{left:4px;top:22px}#base1{right:4px;top:22px}
-.current-batter-card{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-top:1rem;background:#fff9eb}
-.current-batter-card h2{margin:.12rem 0}
-.current-batter-card p{margin:.2rem 0;color:var(--muted)}
-.scoring-help{margin-top:1rem;background:#fff0ca;border-left:6px solid var(--gold)}
+.scoring-help{margin-top:.75rem;background:#fff0ca;border-left:6px solid var(--gold);font-size:.82rem;line-height:1.45}
+.game-control-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem;margin-top:.8rem;padding-top:.8rem;border-top:1px solid #dec89e}.game-control-row button{min-width:0;white-space:normal}
 .team-score-section{margin-top:1rem;padding:0;overflow:hidden}
 .team-score-heading{display:flex;justify-content:space-between;align-items:center;padding:.85rem 1rem;background:#5a3825;color:white}
 .team-score-heading h3{color:white;margin:0}.team-score-heading span{font-size:.8rem;color:#f2ddb7}
@@ -102,7 +100,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
 .scoring-table th:first-child{z-index:4;background:#ead6b4}
 .scoring-table td.stat-cell,.scoring-table th.stat-cell{min-width:48px}
 .pa-select{min-width:68px;max-width:86px;min-height:40px;padding:.45rem .35rem;font-weight:800;color:var(--brown);background:#fffdf8}
-.pa-select.has-play{background:#fff0c6;border-color:#bd7b2f;color:#6a3214}
+.pa-control{position:relative;display:block;min-width:68px}.pa-select.has-play{background:#fff0c6;border-color:#bd7b2f;color:#6a3214}.pa-control.is-looking-k .pa-select{color:transparent}.mirrored-k-mark{position:absolute;inset:0 20px 0 0;display:grid;place-items:center;pointer-events:none;font-size:1rem;font-weight:800;color:#6a3214;transform:scaleX(-1);transform-origin:center}.mirrored-k-inline{display:inline-block;transform:scaleX(-1);font:inherit;font-weight:inherit}
 .player-cell strong{display:block;font-size:.88rem}.player-cell span{display:block;font-size:.73rem;color:var(--muted);margin-top:.12rem}
 .summary-card{overflow-x:auto}
 .line-score-table,.batting-table{border-collapse:collapse;width:100%;background:white}
@@ -139,7 +137,6 @@ input:focus,select:focus,textarea:focus{border-color:var(--orange);box-shadow:0 
   .pitcher-row{grid-template-columns:1.8rem 3.2rem minmax(8rem,1fr) 4.4rem 4.9rem 4.2rem 4rem;min-width:560px}
   .lineup-inputs,.pitcher-inputs{overflow-x:auto;padding-bottom:.3rem}
   .scoreboard-card{grid-template-columns:1fr 110px 1fr;padding:.7rem}.scoreboard-team{display:grid;gap:.1rem}.scoreboard-team.home{justify-items:end}.scoreboard-team strong{font-size:2.5rem}.inning-state strong{font-size:1rem}
-  .current-batter-card{align-items:flex-start;flex-direction:column}.current-batter-card .button-row{display:grid;grid-template-columns:1fr 1fr;width:100%}.current-batter-card .button-row button:last-child{grid-column:1/-1}
   .team-score-heading{align-items:flex-start;flex-direction:column;gap:.2rem}
   .runner-grid{grid-template-columns:1fr 1fr}
   .play-dialog{margin:auto;width:calc(100vw - .5rem);max-height:98vh}.play-dialog form{padding:.8rem}
@@ -219,7 +216,7 @@ img{display:block;max-width:100%}
   max-width:none;
 }
 .hero-actions button,.hero-actions .button{width:100%;min-width:0;text-align:center;white-space:normal}
-.app-shell,.panel,.entry-card,.summary-card,.team-score-section,.current-batter-card,.scoring-help{min-width:0}
+.app-shell,.panel,.entry-card,.summary-card,.team-score-section,.scoring-help,.live-matchup-card{min-width:0}
 .step-nav{flex-wrap:wrap;overflow:visible}
 .step{flex:0 1 auto}
 .mode-grid,.lineup-input-wrap,.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -293,7 +290,6 @@ input,select,textarea{max-width:100%;min-width:0}
   .scoreboard-card{grid-template-columns:minmax(0,1fr) 104px minmax(0,1fr);gap:.35rem}
   .scoreboard-team{min-width:0}
   .scoreboard-team span{overflow-wrap:anywhere}
-  .current-batter-card .button-row button{min-width:0;white-space:normal}
   .scoring-table th,.scoring-table td{min-width:66px;padding:.32rem}
   .scoring-table th:first-child,.scoring-table td:first-child{min-width:145px;max-width:165px}
   .pa-select{min-width:61px;max-width:74px;font-size:.78rem}
@@ -310,13 +306,11 @@ input,select,textarea{max-width:100%;min-width:0}
   .step-nav{top:28px;gap:.4rem}
   .step{font-size:.72rem;padding:.48rem .58rem}
   .panel h2{font-size:1.35rem}
-  .entry-card,.summary-card,.team-score-section,.current-batter-card,.scoring-help{padding:.78rem;border-radius:13px}
+  .entry-card,.summary-card,.team-score-section,.scoring-help,.live-matchup-card{padding:.78rem;border-radius:13px}
   .scoreboard-card{grid-template-columns:minmax(0,1fr) 86px minmax(0,1fr);padding:.58rem;border-width:2px}
   .scoreboard-team{font-size:.78rem}.scoreboard-team strong{font-size:2rem}
   .inning-state strong{font-size:.9rem}.inning-state span{font-size:.72rem}
   .bases{transform:scale(.72);margin-top:-5px}
-  .current-batter-card .button-row{grid-template-columns:1fr}
-  .current-batter-card .button-row button:last-child{grid-column:auto}
   .runner-grid{grid-template-columns:1fr}
   .dialog-actions{display:grid;grid-template-columns:1fr 1fr}
   .dialog-actions .spacer{display:none}
@@ -373,9 +367,12 @@ input,select,textarea{max-width:100%;min-width:0}
 
 /* Version 21 pitch-by-pitch scoring console */
 .pitch-console{margin-top:1rem;padding:clamp(.9rem,2vw,1.25rem);border:2px solid #d9a441;border-radius:20px;background:linear-gradient(145deg,#fffdf7,#fff3cf);box-shadow:0 10px 24px rgba(70,39,20,.12);min-width:0}
-.pitch-console-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding-bottom:.85rem;border-bottom:1px solid #dec89e}
-.pitch-console-header h2{margin:.1rem 0 .25rem}.pitch-status{margin:0;color:var(--muted);font-size:.9rem}
-.count-display{flex:0 0 auto;min-width:170px;text-align:center;border-radius:18px;padding:.65rem 1rem;background:#3d2519;color:#fff8e9;border:3px solid var(--gold);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.pitch-console-header{display:grid;grid-template-columns:minmax(210px,.68fr) minmax(520px,1.45fr);align-items:stretch;gap:1rem;padding-bottom:.85rem;border-bottom:1px solid #dec89e}
+.pitch-console-intro{align-self:center}.pitch-console-header h2{margin:.1rem 0 .25rem}.pitch-status{margin:0;color:var(--muted);font-size:.9rem}
+.count-and-matchup{display:grid;grid-template-columns:minmax(170px,.45fr) minmax(320px,1fr);gap:.75rem;min-width:0}
+.count-display{min-width:170px;text-align:center;border-radius:18px;padding:.65rem 1rem;background:#3d2519;color:#fff8e9;border:3px solid var(--gold);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);display:grid;align-content:center}
+.live-matchup-card{padding:.7rem .85rem;background:linear-gradient(180deg,#fffdf8,#fff5dd);display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;min-width:0}
+.live-player{min-width:0;padding:.15rem .7rem}.live-player+ .live-player{border-left:1px solid #dcc49b}.live-player-label{margin:0;color:var(--orange);font-size:.67rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase}.live-player h3{margin:.15rem 0 .18rem;font-family:Georgia,"Times New Roman",serif;font-size:clamp(1rem,1.8vw,1.35rem);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-player p{margin:.12rem 0;color:var(--muted);font-size:.76rem;line-height:1.35}.live-player-details{min-height:2.05em}.live-player strong{color:var(--brown)}
 .count-display>div{display:flex;align-items:center;justify-content:center;gap:.55rem;line-height:1}.count-display strong{font-size:clamp(2.6rem,7vw,4.4rem);font-variant-numeric:tabular-nums}.count-display span{font-size:2rem;color:var(--gold)}.count-display small{display:block;margin-top:.35rem;font-size:.68rem;font-weight:850;letter-spacing:.13em}
 .pitch-button-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem;margin-top:.9rem}
 .pitch-button{min-height:76px;display:flex;flex-direction:column;gap:.35rem;border-width:2px;font-size:1.05rem}.pitch-button span{font-weight:900}.pitch-button kbd,.compact kbd{font-size:.68rem;padding:.12rem .38rem;border-radius:5px;background:rgba(255,255,255,.58);border:1px solid currentColor;font-family:inherit}
@@ -388,7 +385,8 @@ input,select,textarea{max-width:100%;min-width:0}
 .quick-result-grid[hidden],.quick-result-grid.is-collapsed{display:none!important}.quick-result-button{min-height:56px;padding:.45rem .35rem;display:grid;gap:.08rem;background:white;color:var(--brown);border:1px solid #d8bd87;border-radius:10px;min-width:0}.quick-result-button strong{font-size:1rem}.quick-result-button span{font-size:.67rem;line-height:1.15;font-weight:700}.quick-result-button:hover,.quick-result-button:focus-visible{background:#fff0c6;border-color:#a75b27}
 .keyboard-help{margin:.75rem 0 0;font-size:.75rem;line-height:1.45;color:#6d5948}
 @media (max-width:1000px){.quick-result-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
-@media (max-width:760px){.pitch-console-header{align-items:stretch;flex-direction:column}.count-display{width:100%;min-width:0}.pitch-button-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pitch-tool-row{align-items:stretch;flex-direction:column}.pitch-tool-row .button-row{display:grid;grid-template-columns:1fr 1fr;width:100%}.quick-result-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.terminal-choice-buttons{grid-template-columns:1fr}.keyboard-help{display:none}}
+@media (max-width:900px){.pitch-console-header{grid-template-columns:1fr}.count-and-matchup{grid-template-columns:minmax(150px,.38fr) minmax(0,1fr)}}
+@media (max-width:760px){.count-and-matchup{grid-template-columns:1fr}.count-display{width:100%;min-width:0}.live-matchup-card{grid-template-columns:1fr}.live-player+ .live-player{border-left:0;border-top:1px solid #dcc49b;padding-top:.65rem}.pitch-button-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pitch-tool-row{align-items:stretch;flex-direction:column}.pitch-tool-row .button-row{display:grid;grid-template-columns:1fr 1fr;width:100%}.quick-result-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.terminal-choice-buttons{grid-template-columns:1fr}.keyboard-help{display:none}.game-control-row{grid-template-columns:1fr}}
 @media (max-width:430px){.pitch-console{padding:.72rem;border-radius:15px}.count-display strong{font-size:3.1rem}.pitch-button{min-height:68px}.strike-button-pair .pitch-button{font-size:.84rem;padding:.45rem .18rem}.quick-results-heading{align-items:stretch;flex-direction:column}.quick-results-heading button{width:100%}.quick-result-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-result-button{min-height:58px}}
 
 
@@ -423,3 +421,44 @@ input,select,textarea{max-width:100%;min-width:0}
 .blank-pdf-choice .choice-card span{display:block;font-size:.78rem;font-weight:700}
 @media(max-width:560px){.blank-pdf-choice .choice-grid{grid-template-columns:1fr}.pa-select{min-width:65px;max-width:74px;height:48px;font-size:1.03rem}}
 @media print{.print-scorecard .score-box{font-size:10.5pt;font-weight:900;line-height:1.05}}
+
+
+/* Version 25: MLB ABS challenge tracking */
+.abs-challenge-card{margin-top:1rem;padding:clamp(.9rem,2vw,1.2rem);border:2px solid var(--gold);border-radius:20px;background:linear-gradient(145deg,#fffdf7,#fff3cf);box-shadow:0 10px 24px rgba(70,39,20,.1)}
+.abs-challenge-header{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;padding-bottom:.8rem;border-bottom:1px solid #dec89e}.abs-challenge-header h2{margin:.1rem 0 .2rem}.abs-challenge-header p{margin:.1rem 0;color:var(--muted)}
+.abs-rule-note{max-width:420px;padding:.7rem .8rem;border-left:5px solid var(--gold);border-radius:9px;background:#fff9e9;font-size:.8rem;line-height:1.4}
+.challenge-team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;margin-top:.85rem}.challenge-team-card{padding:.85rem;border:1px solid #d8bd87;border-radius:15px;background:#fffaf0}.challenge-team-heading{display:flex;align-items:center;justify-content:space-between;gap:.7rem}.challenge-team-heading h3{margin:0}.challenge-team-heading strong{font-size:.82rem;color:var(--brown)}
+.challenge-token-row{display:flex;align-items:center;gap:.55rem;margin:.7rem 0}.challenge-token{width:42px;height:42px;padding:0;border-radius:50%;display:grid;place-items:center;border:2px solid var(--brown);background:white;color:var(--brown);font-size:.72rem;font-weight:900}.challenge-token.is-lost{background:var(--brown);color:white}.challenge-token.is-available{background:#fff1bf;border-color:#a96a1f}.challenge-token.is-locked{opacity:.45;border-style:dashed}.challenge-token:disabled{cursor:default}.challenge-record-button{width:100%}.challenge-record-button:disabled{opacity:.5}.challenge-status{margin:.55rem 0 0;color:var(--muted);font-size:.78rem;line-height:1.35}
+.challenge-log-heading{display:flex;align-items:end;justify-content:space-between;gap:1rem;margin-top:1rem}.challenge-log-heading h3{margin:0}.challenge-log-heading span{font-size:.78rem;color:var(--muted)}.challenge-event-log{margin-top:.55rem;border:1px solid #dcc49b;border-radius:14px;overflow:hidden;background:#fffdf8}.challenge-log-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;align-items:center;padding:.7rem .8rem;border-bottom:1px solid #eadfc9}.challenge-log-item:last-child{border-bottom:0}.challenge-log-item strong{display:block}.challenge-log-item p{margin:.15rem 0 0;color:var(--muted);font-size:.78rem;line-height:1.35}.challenge-log-item button{min-height:34px;padding:.35rem .6rem;font-size:.75rem}
+.challenge-dialog{max-width:650px}.challenge-dialog-team{padding:.65rem .75rem;border-radius:10px;background:#fff2c9;border-left:5px solid var(--gold);font-weight:850}.challenge-pitch-summary{margin:.8rem 0;padding:.65rem .75rem;border:1px solid #dec89e;border-radius:10px;background:#fffaf0;color:var(--muted);font-size:.82rem;line-height:1.4}
+@media(max-width:760px){.abs-challenge-header{flex-direction:column}.abs-rule-note{max-width:none}.challenge-team-grid{grid-template-columns:1fr}.challenge-log-item{grid-template-columns:1fr}.challenge-log-item button{width:100%}}
+
+.summary-challenge-lines{display:grid;gap:.25rem;margin-top:.75rem;padding:.7rem;border-radius:10px;background:#fff5d7;color:var(--brown);font-size:.8rem}.summary-challenge-lines span{display:block}
+
+/* Version 26 game-management additions: bench substitutions, key plays, and errors */
+.bench-roster{margin-top:.85rem;border-top:1px solid #dfceb0;padding-top:.75rem}.bench-roster summary{cursor:pointer;font-weight:900;color:var(--brown)}.bench-roster>p{margin:.35rem 0 .65rem;color:var(--muted);font-size:.78rem}.bench-inputs{display:grid;gap:.45rem}.bench-row{display:grid;grid-template-columns:2rem 3.4rem minmax(8rem,2.2fr) 5rem 5rem 4.8rem 4.8rem;gap:.4rem;align-items:center}.bench-row input{min-width:0;padding:.5rem .55rem;min-height:38px}
+.player-cell-content{display:grid;gap:.2rem}.player-cell-content .player-current{display:grid;gap:.05rem}.substitution-history{display:grid;gap:.1rem;margin-top:.15rem}.substitution-history small{font-size:.65rem;line-height:1.2;color:#74563f}.substitution-select{margin-top:.25rem;min-height:30px;padding:.25rem .35rem;font-size:.7rem;max-width:100%}
+.pitching-change-box{margin-top:.85rem;padding:.75rem;border:1px solid #d9c49a;border-radius:12px;background:#fff9e9}.pitching-change-box label{margin:0}.pitching-change-box p{margin:.35rem 0 0;color:var(--muted);font-size:.76rem}
+.play-note-tools{display:flex;gap:.55rem;align-items:center;margin:.8rem 0 .55rem}.key-play-button.is-active{background:#9b4d1f;color:white;border-color:#9b4d1f}
+.key-play-mark{position:absolute;top:2px;right:3px;display:grid;place-items:center;width:15px;height:15px;border-radius:50%;background:#9b4d1f;color:#fff8e9;font-size:.58rem;line-height:1;font-weight:900;box-shadow:0 1px 3px rgba(61,37,25,.3);pointer-events:none;z-index:2}
+.error-assignment-panel{margin:.55rem 0 .8rem;padding:.8rem;border:2px solid #bd6b2a;border-radius:14px;background:#fff4d6}.error-panel-heading{display:flex;justify-content:space-between;gap:.7rem;align-items:flex-start}.error-panel-heading>div{display:grid;gap:.1rem}.error-panel-heading span{font-size:.75rem;color:var(--muted)}.small-icon{width:30px;height:30px;min-height:30px}.error-assignment-rows{display:grid;gap:.55rem;margin:.7rem 0}.error-assignment-row{display:grid;grid-template-columns:minmax(10rem,1.3fr) minmax(8rem,1fr) auto;gap:.5rem;align-items:end}.error-assignment-row label{margin:0}.remove-error-button{min-height:40px;padding:.4rem .55rem}.error-assignment-panel textarea{margin-top:.25rem}
+.substitution-dialog{max-width:660px}.substitution-matchup{display:grid;grid-template-columns:1fr auto 1fr;gap:.7rem;align-items:center;margin:.7rem 0 1rem;padding:.75rem;border:1px solid #dcc49b;border-radius:12px;background:#fff8e9}.substitution-matchup>div{display:grid;gap:.12rem}.substitution-matchup span{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.fielding-error-summary{margin-top:.7rem;padding:.7rem;border-radius:10px;background:#fff5d7;font-size:.8rem}.fielding-error-summary table{width:100%;border-collapse:collapse}.fielding-error-summary th,.fielding-error-summary td{padding:.35rem;border-bottom:1px solid #e0cfad;text-align:left}
+@media(max-width:1000px){.bench-row{grid-template-columns:2rem 3.2rem minmax(8rem,1fr) 4.4rem 4.5rem 4.2rem 4.2rem;min-width:560px}.bench-inputs{overflow-x:auto;padding-bottom:.3rem}}
+@media(max-width:760px){.error-assignment-row{grid-template-columns:1fr}.remove-error-button{width:100%}.substitution-matchup{grid-template-columns:1fr;text-align:left}.substitution-matchup>div:nth-child(2){transform:rotate(90deg);justify-self:center}.play-note-tools{display:grid;grid-template-columns:1fr 1fr}.bench-inputs{overflow:visible}.bench-row{grid-template-columns:repeat(2,minmax(0,1fr));min-width:0;padding:.65rem;border:1px solid #e2d2b5;border-radius:12px}.bench-row .row-number{grid-column:1/-1}}
+@media(max-width:430px){.play-note-tools{grid-template-columns:1fr}.bench-row{grid-template-columns:1fr}}
+
+
+/* Version 27: regulation ending, extra innings, and safe export controls */
+.game-status-label{display:block;margin-top:.22rem;font-size:.72rem;font-weight:800;line-height:1.15;color:var(--muted)}
+.game-status-label.is-final{color:#8c1d18;text-transform:uppercase;letter-spacing:.04em}
+.game-status-label.is-extra{color:var(--secondary)}
+.post-export-dialog .choice-card{text-align:left;min-height:7rem}
+.post-export-dialog .danger.choice-card{background:#fff5f3;border:1px solid #b42318;color:#7a271a}
+.game-final .pitch-console,.game-final .quick-results-card{opacity:.72}
+.game-final .pitch-button,.game-final .quick-result-grid button{pointer-events:none}
+@media(max-width:700px){.game-status-label{font-size:.68rem}.post-export-dialog .choice-grid{grid-template-columns:1fr}}
+
+/* Version 27.2 compact starter-first pitcher workflow */
+.pitcher-data-pool{display:none!important}.selected-pitcher-inputs{display:grid;gap:.55rem}.selected-pitcher-inputs .pitcher-row{border:1px solid #e3d1af;border-radius:12px;padding:.5rem;background:#fffdf7}.selected-pitcher-inputs .starter-pitcher-row{background:#fff7dc;border-color:#d2aa58}.selected-pitcher-inputs .is-active-pitcher{box-shadow:inset 4px 0 0 var(--secondary)}.selected-pitcher-inputs .is-active-pitcher .row-number{background:var(--secondary);color:white}.pitching-change-box{margin-top:.8rem}.pitching-change-box label{font-weight:900}.pitching-change-box select:disabled{opacity:.72;cursor:not-allowed}.pitching-change-box p{line-height:1.35}.custom-pitcher-dialog{max-width:720px}
+@media(max-width:760px){.selected-pitcher-inputs .pitcher-row{padding:.65rem}.custom-pitcher-dialog .form-grid{grid-template-columns:1fr}.custom-pitcher-dialog .span-two{grid-column:auto}}
