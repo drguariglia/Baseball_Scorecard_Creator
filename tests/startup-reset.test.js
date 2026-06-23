@@ -16,7 +16,7 @@ assert.match(app, /scoring=initialScoring\(\)/, "scoring state must return to ze
 assert.match(app, /event\.persisted[\s\S]*initializeBlankStartup\(\)/, "back-forward cache restoration must be cleared");
 assert.match(app, /Reset the entire game\?/, "reset confirmation must describe a complete reset");
 assert.match(html, /Reset Entire Game/, "reset button must describe the complete reset");
-assert.match(html, /app\.js\?v=21/, "app JavaScript must be cache-busted");
-assert.match(worker, /guariglia-scorecard-v21-1/, "service-worker cache must be bumped");
+assert.match(html, /app\.js\?v=23-scroll-preserve/, "app JavaScript must be cache-busted");
+assert.match(worker, /guariglia-scorecard-v23-scroll-preserve/, "service-worker cache must be bumped");
 
 console.log("startup and reset tests passed");

@@ -30,7 +30,7 @@ async function getJson(url: string, attempts = 2) {
       const response = await fetch(url, {
         headers: {
           Accept: "application/json",
-          "User-Agent": "Guariglia-Baseball-Scorecard/15"
+          "User-Agent": "Guariglia-Baseball-Scorecard/22"
         },
         signal: controller.signal
       });

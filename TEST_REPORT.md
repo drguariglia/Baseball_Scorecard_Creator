@@ -1,71 +1,149 @@
-# Version 21 Test Report
-
-## Scope
-
-Version 21 was built from the controlling Version 20 source. The live-scoring interface was redesigned around pitch-by-pitch count entry while preserving schedule lookup, blank startup, refresh behavior, classic scorecard exports, responsive layout, and saved-game compatibility.
+# Version 22 Test Report
 
 ## Automated source tests
 
-The following tests passed:
+All tests passed:
 
-- MLB/MiLB schedule and selected-game data mapping
-- Netlify function and connection-script wiring
-- blank startup and complete reset
-- Refresh Schedule clearing and scroll-position retention
-- responsive desktop, reduced-window, and phone rules
-- live balls-strikes controls and keyboard mappings
-- automatic ball-four walk handling
-- strike-three result chooser
-- pitch-count and pitch-sequence storage
+- Baseball schedule data normalization
+- Page/script connection order
+- Blank startup and full reset
+- Refresh clearing and Section 1 retention
+- Responsive layout checks
+- Pitch-count and quick-result controls
+- Permanent pitch tracking
+- Full undo and derived-state rebuilding
+- Show/Hide Codes control behavior
 
-Command: `npm test`
+Commands completed successfully:
 
-Result: all six test files passed.
+- `npm test`
+- `node --check app.js`
+- `node --check baseball-data.js`
+- `node --check service-worker.js`
+- Netlify TypeScript function compilation with a temporary `@netlify/functions` type declaration
 
-## Browser interaction test
+## Browser game-state simulation
 
-A Chromium browser-level test exercised the actual Version 21 interface at desktop and iPhone widths.
+A Chromium browser simulation recorded three completed plate appearances and ten pitches:
 
-Verified:
+1. Single after Ball, Swinging Strike, and In Play
+2. Four-pitch walk
+3. Three-pitch strikeout
 
-- Three balls and two strikes displayed as `3-2` after five pitches.
-- A foul ball with two strikes left the count at `3-2` and increased the pitch total.
-- Undo Pitch removed the foul and restored the prior pitch total.
-- Ball four automatically recorded a walk, advanced to the next batter, and reset the live count to `0-0`.
-- The completed walk retained its final `4-2` count and six-pitch sequence.
-- Strike three displayed Swinging K, Looking K, and Dropped Third Strike choices.
-- Selecting Swinging K recorded the strikeout, added one out, advanced the batter, and reset the count.
-- Keyboard shortcuts recorded Ball and Strike correctly.
-- Keyboard shortcuts continued working after a pitch button retained focus.
-- Desktop horizontal overflow: `0 px`.
-- iPhone horizontal overflow: `0 px`.
+Before undo:
 
-Detailed results are stored in `PITCH_CONSOLE_REPORT.json`.
+- Top 1
+- One out
+- Runners on first and second
+- Ten pitcher pitches
+- Three batters faced
+- One hit, one walk, one strikeout
 
-## Responsive review
+### Undo latest play
 
-The pitch console uses four large controls on desktop and a two-by-two control arrangement on phones. Quick result codes use six columns on wide screens, four on reduced desktop/tablet widths, three on smaller screens, and two on narrow phones.
+After undoing the strikeout:
 
-Screenshots:
+- Outs returned from one to zero
+- Runners remained on first and second
+- Current batter returned correctly
+- Pitch log fell from ten pitches to seven
+- Strikeout and batters-faced totals decreased correctly
 
-- `preview/desktop-pitch-console.png`
-- `preview/iphone-pitch-console.png`
+### Delete an earlier play
 
-## Compatibility
+After deleting the earlier single:
 
-Version 11 through Version 20 saved-game files remain supported. Older files open with the current plate appearance at a `0-0` count because they did not store pitch-by-pitch data.
+- The remaining walk was replayed from an empty diamond
+- Only first base remained occupied
+- Pitch log fell from seven pitches to four
+- Hits fell to zero
+- Walks remained one
+- Batters faced became one
 
+### Edit a historical play
 
-## PDF palette revision
+The remaining walk was changed to a groundout:
 
-The approved Version 21 source was updated without changing its version number. The classic one-page PDF background and overlay text now use the exact burnt orange, dark brown, gold, pale yellow, cream, and warm-cream palette used by the app.
+- Outs became one
+- The diamond became empty
+- Walks became zero
+- Batters faced remained one
+- All later snapshots were rebuilt
 
-Verified:
+### Undo an inning-ending play
 
-- PDF page geometry remains 612 × 792 points (US Letter portrait).
-- Embedded background dimensions remain 1275 × 1650 pixels.
-- No scorecard rows, columns, labels, scoring boxes, or note areas moved.
-- The previous pink/peach total-cell tint was replaced with warm cream.
-- Header text uses cream rather than pure white.
-- JavaScript syntax and the full Version 21 automated test suite pass.
-- A rendered sample PDF was visually inspected for clipping, overlap, and palette consistency.
+A single followed by a double play moved the game to Bottom 1. Undoing the double play restored:
+
+- Top 1
+- One out
+- Runner on first
+- Empty second and third bases
+- Correct current batter
+
+### Actual plate-appearance selector deletion
+
+The test also used the visible plate-appearance dropdown itself, selected the blank option, and confirmed deletion. The app rebuilt to:
+
+- Top 1
+- Zero outs
+- Runner on first
+- One remaining completed play
+- One remaining recorded pitch
+- One hit, zero walks, one batter faced
+
+## Additional correction
+
+The browser simulation identified and verified a fix for runners marked **Stayed/Hold**. They now remain on their original bases instead of disappearing after a strikeout or other out.
+
+## Artifacts
+
+- `UNDO_REBUILD_REPORT.json` contains the complete before-and-after state snapshots.
+- `preview/undo-rebuilt-game-state.png` shows the restored inning, outs, current batter, and interactive diamond.
+- `preview/undo-rebuilt-pitch-tracking.png` shows recalculated pitcher statistics and pitch history.
+- `preview/undo-via-pa-selector.png` shows the state after deleting a play through the plate-appearance selector.
+
+## Show/Hide Codes browser verification
+
+The control was tested in Chromium at desktop and iPhone widths.
+
+Initial visible state:
+
+- Button label: **Hide Codes**
+- `aria-expanded`: `true`
+- Grid display: `grid`
+- Grid height: 312 pixels in the desktop test
+
+After selecting **Hide Codes**:
+
+- Button label changed to **Show Codes**
+- `aria-expanded` changed to `false`
+- `aria-hidden` changed to `true`
+- The `hidden` attribute and `is-collapsed` class were both applied
+- Computed display became `none`
+- Grid height became zero
+
+After selecting **Show Codes** again, all values returned to the visible state. A complete game-state snapshot before, during, and after the toggle remained identical, confirming that the control changes presentation only and does not alter scoring data.
+
+Artifacts:
+
+- `SHOW_HIDE_CODES_REPORT.json` contains the browser assertions.
+- `preview/show-hide-codes-desktop.png` shows the expanded desktop layout.
+- `preview/show-hide-codes-iphone-hidden.png` shows the collapsed iPhone layout.
+
+## Version 23 Fill App scroll verification
+
+The **Fill App from Selected Game** workflow was tested in headless Chromium using a mocked official-game response.
+
+- Viewport before import: `x=0, y=520`
+- Viewport after import: `x=0, y=520`
+- Vertical movement: `0 pixels`
+- Focus after import: `lookupGameBtn`
+- Away and home team fields populated successfully
+- Browser page errors: none
+
+Artifacts:
+
+- `FILL_APP_SCROLL_REPORT.json`
+- `preview/fill-app-scroll-preserved.png`
+
+The regression suite also confirms that normal section navigation retains its existing scroll-to-top behavior, while selected-game import explicitly suppresses it.

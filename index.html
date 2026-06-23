@@ -9,14 +9,14 @@
   <meta name="apple-mobile-web-app-title" content="Guariglia Scorecard" />
   <title>Guariglia Baseball Scorecard Builder</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=21" />
+  <link rel="stylesheet" href="styles.css?v=23-scroll-preserve" />
 </head>
 <body>
   <header class="hero no-print">
     <div class="hero-brand">
       <div class="brand-mark-wrap"><img class="brand-mark" src="assets/guariglia-crest.gif" alt="Guariglia crest" /></div>
       <div class="hero-copy">
-        <p class="eyebrow">Guariglia company app • Version 21</p>
+        <p class="eyebrow">Guariglia company app • Version 23</p>
         <h1>Baseball Scorecard Builder & Live Scorer</h1>
         <p class="subtitle">Build the scorecard, score every plate appearance from a phone or desktop, and export the finished game.</p>
       </div>
@@ -37,8 +37,9 @@
       <button class="step" data-panel="lineups" type="button"><span>2</span> Lineups</button>
       <button class="step" data-panel="pitching" type="button"><span>3</span> Pitching</button>
       <button class="step live-step" data-panel="scoring" type="button"><span>4</span> Live Scoring</button>
-      <button class="step" data-panel="summary" type="button"><span>5</span> Summary</button>
-      <button class="step" data-panel="settings" type="button"><span>6</span> Settings</button>
+      <button class="step" data-panel="pitchTracking" type="button"><span>5</span> Pitch Tracking</button>
+      <button class="step" data-panel="summary" type="button"><span>6</span> Summary</button>
+      <button class="step" data-panel="settings" type="button"><span>7</span> Settings</button>
     </nav>
 
     <section id="setup" class="panel active">
@@ -138,11 +139,19 @@
           </div>
         </div>
 
+        <div class="active-pitcher-row">
+          <label><span id="activePitcherTeamLabel">Defensive pitcher</span><select id="activePitcherSelect"></select></label>
+          <p>Choose the pitcher currently on the mound. Every new pitch and completed plate appearance will be credited to this selection.</p>
+        </div>
+
         <div class="pitch-button-grid" aria-label="Pitch controls">
-          <button id="ballBtn" class="pitch-button ball-button" type="button"><span>Ball</span><kbd>B</kbd></button>
-          <button id="strikeBtn" class="pitch-button strike-button" type="button"><span>Strike</span><kbd>S</kbd></button>
-          <button id="foulBtn" class="pitch-button foul-button" type="button"><span>Foul</span><kbd>F</kbd></button>
-          <button id="inPlayBtn" class="pitch-button inplay-button" type="button"><span>In Play</span><kbd>I</kbd></button>
+          <button id="ballBtn" class="pitch-button ball-button" type="button" data-pitch="ball"><span>Ball</span><kbd>B</kbd></button>
+          <div class="strike-button-pair" role="group" aria-label="Strike controls">
+            <button id="swingStrikeBtn" class="pitch-button strike-button swing-strike-button" type="button" data-pitch="swingingStrike"><span>Swinging<br>Strike</span><kbd>S</kbd></button>
+            <button id="calledStrikeBtn" class="pitch-button strike-button called-strike-button" type="button" data-pitch="calledStrike"><span>Called<br>Strike</span><kbd>C</kbd></button>
+          </div>
+          <button id="foulBtn" class="pitch-button foul-button" type="button" data-pitch="foul"><span>Foul</span><kbd>F</kbd></button>
+          <button id="inPlayBtn" class="pitch-button inplay-button" type="button" data-pitch="inplay"><span>In Play</span><kbd>I</kbd></button>
         </div>
 
         <div class="pitch-tool-row">
@@ -154,11 +163,11 @@
         </div>
 
         <div id="strikeoutChooser" class="terminal-choice" hidden>
-          <strong>Strike three — choose the result</strong>
-          <div class="terminal-choice-buttons">
-            <button type="button" data-terminal-outcome="K">K — Swinging</button>
-            <button type="button" data-terminal-outcome="KL">ꓘ — Looking</button>
-            <button type="button" data-terminal-outcome="D3K">K+ — Dropped Third</button>
+          <strong>Was strike three legally caught?</strong>
+          <p class="terminal-choice-note">The normal swinging or looking strikeout was recorded automatically. Use the first button only when the catcher did not legally catch strike three.</p>
+          <div class="terminal-choice-buttons two-choice">
+            <button type="button" data-terminal-outcome="D3K">K+ — Third Strike Not Caught</button>
+            <button type="button" data-terminal-outcome="dismiss">Caught — Keep Strikeout</button>
           </div>
         </div>
 
@@ -170,7 +179,7 @@
           <div id="quickResultGrid" class="quick-result-grid"></div>
         </div>
 
-        <p class="keyboard-help"><strong>Keyboard:</strong> B ball · S strike · F foul · I in play · 1/2/3/4 hit · W walk · H hit-by-pitch · K strikeout · G groundout · O flyout · L lineout · P popout · Backspace undo pitch. After strike 3: K swinging · L looking · D dropped third.</p>
+        <p class="keyboard-help"><strong>Keyboard:</strong> B ball · S swinging strike · C called strike · F foul · I in play · 1/2/3/4 hit · W walk · H hit-by-pitch · K strikeout · G groundout · O flyout · L lineout · P popout · X fielder’s choice · Backspace undo pitch. After an automatic strikeout: D records that strike three was not caught.</p>
       </section>
 
       <div class="current-batter-card">
@@ -183,7 +192,7 @@
       </div>
 
       <div class="scoring-help">
-        <strong>How to score:</strong> use the pitch console to build the count. Ball 4 records a walk automatically. Strike 3 asks for swinging, looking, or dropped-third-strike. Use the quick-result codes when the plate appearance ends.
+        <strong>How to score:</strong> use Ball, Swinging Strike, Called Strike, Foul, and In Play to build the count. Ball 4 records a walk automatically. Strike 3 asks for swinging, looking, or dropped-third-strike. Use the quick-result codes when the plate appearance ends.
       </div>
 
       <div class="team-score-section">
@@ -194,6 +203,22 @@
         <div class="team-score-heading"><h3 id="homeScoringHeading">Home Batters</h3><span>Recorded plate appearances 1–10</span></div>
         <div id="homeScoringGrid" class="scoring-grid-wrap"></div>
       </div>
+    </section>
+
+    <section id="pitchTracking" class="panel">
+      <div class="panel-title-row">
+        <div>
+          <p class="section-kicker">Permanent pitch history</p>
+          <h2>Pitch Tracking</h2>
+          <p>Every pitch and completed plate appearance is retained by pitcher. These totals are recalculated automatically after an undo, deletion, or edited play.</p>
+        </div>
+        <button id="downloadPitchLogBtn" class="secondary" type="button">Download Pitch Log CSV</button>
+      </div>
+      <div id="pitcherTrackingSummary" class="pitcher-tracking-summary"></div>
+      <div class="pitch-log-heading">
+        <div><h3>Pitch-by-pitch log</h3><p id="pitchLogCount">0 recorded pitches</p></div>
+      </div>
+      <div id="pitchEventLog" class="pitch-event-log"></div>
     </section>
 
     <section id="summary" class="panel">
@@ -212,7 +237,7 @@
     <section id="settings" class="panel">
       <div class="panel-title-row"><div><p class="section-kicker">App settings</p><h2>Template, transfer, and installation</h2></div></div>
       <div class="settings-grid">
-        <article class="entry-card"><h3>Excel scorecard template</h3><p>The built-in Scorecard_20260615 template now matches the app’s burnt orange, brown, gold, and cream palette.</p><label>Upload a newer blank template<input id="templateFile" type="file" accept=".xlsx,.xlsm" /></label><p id="templateStatus" class="small-note">Using the built-in blank scorecard.</p><button id="downloadBlankBtn" class="secondary full-width" type="button">Download Blank Scorecard</button></article>
+        <article class="entry-card"><h3>Blank scorecards</h3><p>Download the Excel template or create a one-page blank PDF using the selected home team’s color palette.</p><label>Upload a newer blank template<input id="templateFile" type="file" accept=".xlsx,.xlsm" /></label><p id="templateStatus" class="small-note">Using the built-in blank scorecard.</p><div class="stack-buttons"><button id="downloadBlankBtn" class="secondary full-width" type="button">Download Blank Excel</button><button id="downloadBlankPdfBtn" class="secondary full-width" type="button">Download Blank PDF</button></div></article>
         <article class="entry-card"><h3>Move a game between devices</h3><p>Save a game file on one device and open it on the other. All lineups, scoring, notes, and totals are included.</p><div class="stack-buttons"><button id="saveGameFileBtn2" class="secondary" type="button">Save Game File</button><label class="button secondary file-button">Open Game File<input id="openGameFile2" type="file" accept=".json,.scoregame" /></label></div></article>
         <article class="entry-card"><h3>Install on iPhone</h3><p>Open the Netlify site in Safari, tap Share, then choose <strong>Add to Home Screen</strong>.</p><button id="installBtn" class="secondary full-width" type="button" hidden>Install App</button></article>
       </div>
@@ -221,7 +246,7 @@
 
   <dialog id="playDialog" class="play-dialog no-print">
     <form method="dialog" id="playForm">
-      <div class="dialog-header"><div><p class="section-kicker">Plate appearance details</p><h2 id="dialogTitle">Record Play</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
+      <div class="dialog-header"><div><p class="section-kicker">Plate appearance details</p><h2 id="dialogTitle">Record Play</h2></div><button id="closePlayDialogBtn" class="icon-button" value="cancel" aria-label="Close" type="button">×</button></div>
       <input id="dialogTeam" type="hidden" /><input id="dialogPlayerIndex" type="hidden" /><input id="dialogPaIndex" type="hidden" /><input id="dialogPlayId" type="hidden" />
       <div class="form-grid two-col">
         <label>Result<select id="playOutcome"></select></label>
@@ -241,7 +266,19 @@
         <label>Runner from 3rd<select id="runner3Destination"></select></label>
       </div>
       <label>Notes<textarea id="playNotes" rows="3" placeholder="Example: single to right, runner scored on throwing error"></textarea></label>
-      <div class="dialog-actions"><button id="deletePlayBtn" class="danger" type="button" hidden>Delete Play</button><span class="spacer"></span><button class="secondary" value="cancel" type="button">Cancel</button><button id="savePlayBtn" class="primary" value="default" type="submit">Save Play</button></div>
+      <div class="dialog-actions"><button id="deletePlayBtn" class="danger" type="button" hidden>Delete Play</button><span class="spacer"></span><button id="cancelPlayBtn" class="secondary" value="cancel" type="button">Cancel</button><button id="savePlayBtn" class="primary" value="default" type="submit">Save Play</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="blankPdfDialog" class="play-dialog blank-pdf-choice no-print">
+    <form method="dialog">
+      <div class="dialog-header"><div><p class="section-kicker">Blank scorecard PDF</p><h2>Choose the scoring-box style</h2></div><button class="icon-button" value="cancel" aria-label="Close" type="submit">×</button></div>
+      <p>The completed computer-scored PDF always uses clean boxes. For a blank printable scorecard, choose whether to retain the traditional plus signs and 2×3 ball-strike counters.</p>
+      <div class="choice-grid">
+        <button id="blankPdfWithGuidesBtn" class="secondary choice-card" type="button"><strong>Include Traditional Guides</strong><span>Keep the plus signs and 2×3 counters for handwritten scoring.</span></button>
+        <button id="blankPdfCleanBtn" class="primary choice-card" type="button"><strong>Use Clean Boxes</strong><span>Remove the plus signs and counters from the blank PDF.</span></button>
+      </div>
+      <div class="dialog-actions"><span class="spacer"></span><button class="secondary" value="cancel" type="submit">Cancel</button></div>
     </form>
   </dialog>
 
@@ -249,8 +286,8 @@
 
   <script src="vendor/jszip.min.js"></script>
   <script src="template_data.js"></script>
-  <script src="pdf_background_data.js?v=21-pdf-palette"></script>
-  <script src="baseball-data.js?v=21"></script>
-  <script src="app.js?v=21-pdf-palette"></script>
+  <script src="pdf_background_data.js?v=23-home-team-pdf"></script>
+  <script src="baseball-data.js?v=23"></script>
+  <script src="app.js?v=23-scroll-preserve"></script>
 </body>
 </html>

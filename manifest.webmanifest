@@ -1,7 +1,7 @@
 {
-  "name": "Guariglia Baseball Scorecard Builder & Live Scorer",
-  "short_name": "Guariglia Scorecard",
-  "description": "Build, score, print, and export baseball games from a phone or desktop.",
+  "name": "Guariglia Baseball Scorecard Builder Version 23",
+  "short_name": "Scorecard V23",
+  "description": "Baseball scorecard builder and live scorer with permanent pitch tracking and pitcher statistics.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fff8e9",

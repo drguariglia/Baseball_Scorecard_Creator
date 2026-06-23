@@ -1,17 +1,17 @@
-const CACHE = "guariglia-scorecard-v21-1";
+const CACHE = "guariglia-scorecard-v23-scroll-preserve";
 const CORE_ASSETS = [
-  "/styles.css?v=21",
-  "/app.js?v=21-pdf-palette",
-  "/baseball-data.js?v=21",
+  "/styles.css?v=23-scroll-preserve",
+  "/app.js?v=23-scroll-preserve",
+  "/baseball-data.js?v=23",
   "/template_data.js",
-  "/pdf_background_data.js?v=21-pdf-palette",
+  "/pdf_background_data.js?v=23-home-team-pdf",
   "/vendor/jszip.min.js",
   "/assets/guariglia-crest.gif",
   "/assets/icon-192.png",
   "/assets/icon-512.png",
   "/assets/Scorecard_20260615_blank_template.xlsx",
   "/assets/Scorecard_20260615_App_Colors_Classic_Blank.xlsx",
-  "/assets/classic-scorecard-background.jpg?v=21-pdf-palette",
+  "/assets/classic-scorecard-background.jpg?v=23-home-team-pdf",
   "/manifest.webmanifest"
 ];
 

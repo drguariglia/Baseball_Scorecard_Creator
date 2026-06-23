@@ -1,35 +1,53 @@
-# Guariglia Baseball Scorecard Builder & Live Scorer — Version 21
+# Guariglia Baseball Scorecard Builder & Live Scorer — Version 22
 
-Version 21 uses Version 20 as its controlling source and redesigns live scoring around pitch-by-pitch entry.
+Version 22 builds on the approved Version 21 source and adds permanent pitch-by-pitch storage, pitcher statistics, and full game-state rebuilding after an undo or edited play.
 
-## New pitch console
+## Pitch tracking
 
-- Large live balls-strikes count for phone and desktop.
-- One-tap Ball, Strike, Foul, and In Play buttons.
-- Keyboard shortcuts: B, S, F, I, number keys 1–4 for hits, W for walk, H for hit-by-pitch, K for strikeout, G for groundout, O for flyout, L for lineout, P for popout, and Backspace to undo the last pitch.
-- Ball four automatically records a walk and advances forced runners.
-- Strike three presents Swinging K, Looking K, and Dropped Third Strike choices.
-- Quick result-code buttons for common hits, outs, walks, errors, and special plays.
-- Results that are unambiguous are recorded immediately. Plays involving runner movement open the existing detail window with defaults already filled in.
-- The plate-appearance grids remain available below the pitch console for review and historical editing.
-- Pitch count and pitch sequence are stored in the play log and saved game file.
+- Every Ball, Swinging Strike, Called Strike, Foul, In Play, and Hit By Pitch is stored as a separate pitch event.
+- Each event retains the pitcher, batter, inning, half-inning, count before and after, pitch code, and timestamp.
+- The Active Pitcher selector credits every new pitch and completed plate appearance to the correct pitcher.
+- The separate Pitch Tracking section reports pitches, strikes, balls, strike percentage, swinging strikes, called strikes, fouls, balls in play, batters faced, hits, walks, intentional walks, hit batters, and strikeouts.
+- The complete pitch log can be downloaded as a CSV file.
 
+## Undo and correction behavior
 
-## PDF palette alignment
+Version 22 now treats the ordered play log as the source of truth for all derived game information. Whenever a completed play is undone, deleted from a plate-appearance selector, or edited, the app rebuilds every remaining play from the beginning and recalculates:
 
-The one-page PDF export now uses the exact approved app palette while keeping the classic Version 8–10 scorecard geometry unchanged:
+- Current inning and half-inning
+- Outs
+- Runs, hits, errors, and inning totals
+- Current batter and batting-order position
+- First-, second-, and third-base occupancy on the interactive diamond
+- Batter totals
+- Pitcher pitches, strikes, balls, walks, hit batters, strikeouts, hits, and batters faced
+- Pitch-event ownership and the current in-progress pitch session
 
-- Burnt orange `#9B4D1F`
-- Dark brown `#3D2519`
-- Gold `#D9A441`
-- Pale yellow `#FBE9B8`
-- Cream `#FFF8E9`
-- Warm cream `#F6EAD0`
+Runners marked **Stayed** now remain on their original bases. This corrects strikeouts, flyouts, and other plays where existing runners hold their positions.
 
-Only the PDF colors changed. Field placement, score boxes, player and pitcher sections, game notes, page size, scoring logic, schedule import, Excel export, and phone/desktop interface remain identical.
+## Show/Hide Codes control
 
-## Preserved features
+- **Hide Codes** now fully removes the quick-result grid from the layout.
+- **Show Codes** restores the complete grid in the same location.
+- The button label, `aria-expanded`, `aria-hidden`, `hidden`, and collapsed CSS state remain synchronized.
+- Toggling the codes does not change the count, inning, outs, runners, plays, pitch history, or pitcher statistics.
+- Choosing **In Play** automatically reopens the result codes so the play can be completed quickly.
 
-The Version 20 schedule connection, refresh behavior, blank startup, classic scorecard layout, responsive interface, Excel export, one-page PDF export, and saved game files remain available. Older Version 11–20 saved games open with a 0-0 current count.
+## Preserved Version 21 features
 
-Deploy the entire unzipped folder so the Netlify function and all supporting assets are included.
+- Burnt orange, brown, gold, yellow, and cream app/PDF palette
+- Classic one-page scorecard layout
+- MLB and MiLB schedule lookup and selected-game import
+- Responsive desktop and iPhone interface
+- Blank startup, full-game reset, and scroll-preserving schedule refresh
+- Split Swinging Strike and Called Strike controls
+- Phone and keyboard scoring controls
+- Quick result codes
+- Excel and one-page PDF exports
+- Saved game files compatible with earlier versions
+
+Deploy the entire unzipped folder so the Netlify function, service worker, templates, and all supporting assets are included.
+
+## Fill App scroll preservation
+
+Selecting **Fill App from Selected Game** now keeps the user at the exact same page position while the selected game information is populated. The button also retains keyboard focus. Normal navigation buttons continue to move to the top of their selected section.
