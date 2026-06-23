@@ -412,7 +412,7 @@ input,select,textarea{max-width:100%;min-width:0}
 @media (max-width:760px){.terminal-choice-buttons.two-choice{grid-template-columns:1fr}}
 
 
-/* Version 23: clean computer scoring boxes and larger generated notation. */
+/* Version 24: clean computer scoring boxes, larger generated notation, and sharpened PDF background. */
 .pa-select{appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center;font-size:1.12rem;line-height:1;font-weight:900;letter-spacing:.015em;min-width:72px;max-width:82px;height:50px;padding:.25rem;border-width:2px;border-radius:8px;cursor:pointer;background-image:none}
 .pa-select.long-code{font-size:.78rem;letter-spacing:-.01em}
 .pa-select option{font-size:1rem;font-weight:800;text-align:left}

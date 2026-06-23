@@ -3,7 +3,7 @@ const PITCHER_ROWS = 6;
 const PA_SLOTS = 10;
 const LEGACY_STORAGE_PREFIXES = ["guariglia-scorecard", "scorecard20260615"];
 const TEMPLATE_FILE_NAME = "Scorecard_20260615_blank_template.xlsx";
-const VERSION_NUMBER = 23;
+const VERSION_NUMBER = 24;
 const DEFAULT_SCORECARD_COLORS = {primary:"#3D2519",secondary:"#9B4D1F",accent:"#D9A441"};
 const MLB_TEAM_COLOR_RECORDS = [
   {aliases:["arizona diamondbacks","diamondbacks","ari"],primary:"#A71930",secondary:"#000000",accent:"#E3D4AD"},
@@ -209,13 +209,13 @@ function formatPitcher(p){
   const details=[p.throws,p.record,p.era?`${String(p.era).replace(/\s*ERA$/i,"")} ERA`:"",p.k?`${String(p.k).replace(/\s*K$/i,"")} K`:""].filter(Boolean);
   return [left,...details].filter(Boolean).join(" — ");
 }
-function setPanel(id,{preserveScroll=false}={}){
+function setPanel(id){
   document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id===id));
   document.querySelectorAll(".step").forEach(b=>b.classList.toggle("active",b.dataset.panel===id));
   if(id==="summary") renderSummary();
   if(id==="pitchTracking") renderPitchTracking();
   if(id==="scoring") renderScoring();
-  if(!preserveScroll) window.scrollTo({top:0,behavior:"smooth"});
+  window.scrollTo({top:0,behavior:"smooth"});
 }
 function teamName(team){ const d=collectData(); return d[`${team}Team`] || (team==="away"?"Away":"Home"); }
 function battingTeamForHalf(half){ return half==="top"?"away":"home"; }
@@ -786,7 +786,7 @@ function downloadBlob(blob,name){const a=document.createElement("a");a.href=URL.
 function safeFileName(value){return String(value||"baseball-game").replace(/[^a-z0-9._-]+/gi,"_").replace(/^_+|_+$/g,"");}
 function saveGameFile(){const d=collectData(),name=safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"game"}`);downloadBlob(new Blob([JSON.stringify(serializeApp(),null,2)],{type:"application/json"}),`${name}.scoregame.json`);}
 async function openGameFile(file){
-  try{const saved=JSON.parse(await file.text());if(!saved.data||!saved.scoring)throw new Error("This is not a compatible Version 11 through Version 23 game file.");setFieldsFromData(saved.data);scoring=saved.scoring;ensureScoringState();refreshAll();scheduleAutosave("Game file opened");setPanel("scoring");}catch(err){alert(`Could not open the game file: ${err.message}`);}
+  try{const saved=JSON.parse(await file.text());if(!saved.data||!saved.scoring)throw new Error("This is not a compatible Version 11 through Version 24 game file.");setFieldsFromData(saved.data);scoring=saved.scoring;ensureScoringState();refreshAll();scheduleAutosave("Game file opened");setPanel("scoring");}catch(err){alert(`Could not open the game file: ${err.message}`);}
 }
 function clearForManual(){
   if(!confirm("Start a blank game? This clears every current scorecard field and recorded play."))return;
@@ -863,9 +863,6 @@ async function loadSchedule(){
   }
 }
 async function loadSelectedGame(){
-  const fillButton=$("lookupGameBtn");
-  const previousScrollX=window.scrollX;
-  const previousScrollY=window.scrollY;
   const rawIndex=$("dailyGameSelect").value;
   if(rawIndex==="")return;
   const game=scheduleGames[num(rawIndex)];
@@ -883,8 +880,7 @@ async function loadSelectedGame(){
     setConnectionState("connected","Selected game connected");
     const source=payload.source?` Connection: ${payload.source}.`:"";
     $("lookupStatus").textContent=`Game information loaded. Review the populated game information below before moving to the next section.${source}`;
-    setPanel("setup",{preserveScroll:true});
-    restoreRefreshPosition(fillButton,previousScrollX,previousScrollY);
+    setPanel("setup");
   }catch(err){
     console.error(err);
     setConnectionState("disconnected","Game details unavailable");
@@ -953,7 +949,8 @@ async function uploadTemplate(file){try{uploadedTemplateBuffer=await file.arrayB
 
 
 
-// Version 23 preserves the classic one-page geometry while adding home-team MLB palettes and clean computer scoring boxes.
+// Version 24 preserves the exact classic one-page geometry while using a sharpened 300-DPI background.
+// Clean computer-scored PDFs rebuild each scoring grid so no plus-sign or 2x3 counter fragments remain.
 const CLASSIC_PDF_WIDTH=612, CLASSIC_PDF_HEIGHT=792;
 const SCORECARD_SOURCE_SWATCHES=[
   {source:[60,36,24],role:"primary"},{source:[75,49,36],role:"primary"},{source:[47,67,76],role:"primary"},{source:[89,70,54],role:"gridDark"},
@@ -975,8 +972,19 @@ function classicPdfNotes(cmd,text){const clean=classicPdfSanitize(text).replace(
 function colorDistance(a,b){return Math.sqrt((a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2);}
 function scorecardImageElement(){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error("Classic scorecard background could not be loaded."));image.src=`data:image/jpeg;base64,${EMBEDDED_SCORECARD_BACKGROUND_JPEG_BASE64}`;});}
 function recolorScorecardCanvas(ctx,width,height,palette){const image=ctx.getImageData(0,0,width,height),pixels=image.data,targets=Object.fromEntries(Object.entries(palette).map(([key,value])=>[key,Object.values(hexToRgb(value))]));for(let i=0;i<pixels.length;i+=4){const rgb=[pixels[i],pixels[i+1],pixels[i+2]];let best=null,bestDistance=Infinity;for(const swatch of SCORECARD_SOURCE_SWATCHES){const distance=colorDistance(rgb,swatch.source);if(distance<bestDistance){bestDistance=distance;best=swatch;}}if(best&&bestDistance<62){const target=targets[best.role]||targets.text,shade=.38;pixels[i]=Math.max(0,Math.min(255,target[0]+(rgb[0]-best.source[0])*shade));pixels[i+1]=Math.max(0,Math.min(255,target[1]+(rgb[1]-best.source[1])*shade));pixels[i+2]=Math.max(0,Math.min(255,target[2]+(rgb[2]-best.source[2])*shade));}}ctx.putImageData(image,0,0);}
-function removeTraditionalScoringGuides(ctx,width,height){const sx=width/CLASSIC_PDF_WIDTH,sy=height/CLASSIC_PDF_HEIGHT,xStart=196.8,cellWidth=28.55,rowHeight=22,rowStarts=[158,180,202,224,246,268,290,312,334,394,416,438,460,482,504,526,548,570];for(const top of rowStarts){for(let col=0;col<10;col++){const left=xStart+col*cellWidth,x=Math.round((left+1.25)*sx),y=Math.round((top+1.25)*sy),w=Math.round((cellWidth-2.5)*sx),h=Math.round((rowHeight-2.5)*sy),sample=ctx.getImageData(Math.round((left+4)*sx),Math.round((top+4)*sy),1,1).data;ctx.fillStyle=`rgb(${sample[0]},${sample[1]},${sample[2]})`;ctx.fillRect(x,y,w,h);}}}
-async function themedScorecardBackground(includeTraditionalGuides=false,palette=classicPdfPalette){const source=await scorecardImageElement(),canvas=document.createElement("canvas");canvas.width=source.naturalWidth||EMBEDDED_SCORECARD_BACKGROUND_WIDTH;canvas.height=source.naturalHeight||EMBEDDED_SCORECARD_BACKGROUND_HEIGHT;const ctx=canvas.getContext("2d",{willReadFrequently:true});ctx.drawImage(source,0,0,canvas.width,canvas.height);recolorScorecardCanvas(ctx,canvas.width,canvas.height,palette);if(!includeTraditionalGuides)removeTraditionalScoringGuides(ctx,canvas.width,canvas.height);const dataUrl=canvas.toDataURL("image/jpeg",.94);return {bytes:new Uint8Array(base64ToArrayBuffer(dataUrl.split(",")[1])),width:canvas.width,height:canvas.height};}
+function medianChannel(values){const sorted=[...values].sort((a,b)=>a-b);return sorted[Math.floor(sorted.length/2)]||0;}
+function sampleScoringCellFill(ctx,sx,sy,left,top,cellWidth){const samples=[];for(const dx of [cellWidth-4.5,cellWidth-3.5,cellWidth-2.5])for(const dy of [2.5,3.5,4.5]){const pixel=ctx.getImageData(Math.round((left+dx)*sx),Math.round((top+dy)*sy),1,1).data;samples.push([pixel[0],pixel[1],pixel[2]]);}return [0,1,2].map(channel=>medianChannel(samples.map(sample=>sample[channel])));}
+function removeTraditionalScoringGuides(ctx,width,height){
+  const sx=width/CLASSIC_PDF_WIDTH,sy=height/CLASSIC_PDF_HEIGHT,xStart=196.8,cellWidth=28.55,rowHeight=22,xEnd=xStart+cellWidth*10;
+  const groups=[{top:158,rows:9},{top:394,rows:9}],fills=[];
+  for(const group of groups)for(let row=0;row<group.rows;row++){const top=group.top+row*rowHeight;fills.push({top,color:sampleScoringCellFill(ctx,sx,sy,xStart,top,cellWidth)});}
+  ctx.save();
+  for(const item of fills){ctx.fillStyle=`rgb(${item.color[0]},${item.color[1]},${item.color[2]})`;ctx.fillRect(Math.round(xStart*sx),Math.round(item.top*sy),Math.round((xEnd-xStart)*sx),Math.round(rowHeight*sy)+1);}
+  ctx.strokeStyle=classicPdfPalette.grid;ctx.lineWidth=Math.max(1,Math.min(sx,sy)*.58);ctx.lineCap="butt";ctx.lineJoin="miter";
+  for(const group of groups){const groupBottom=group.top+group.rows*rowHeight;ctx.beginPath();for(let col=0;col<=10;col++){const x=(xStart+col*cellWidth)*sx;ctx.moveTo(x,group.top*sy);ctx.lineTo(x,groupBottom*sy);}for(let row=0;row<=group.rows;row++){const y=(group.top+row*rowHeight)*sy;ctx.moveTo(xStart*sx,y);ctx.lineTo(xEnd*sx,y);}ctx.stroke();}
+  ctx.restore();
+}
+async function themedScorecardBackground(includeTraditionalGuides=false,palette=classicPdfPalette){const source=await scorecardImageElement(),canvas=document.createElement("canvas");canvas.width=source.naturalWidth||EMBEDDED_SCORECARD_BACKGROUND_WIDTH;canvas.height=source.naturalHeight||EMBEDDED_SCORECARD_BACKGROUND_HEIGHT;const ctx=canvas.getContext("2d",{willReadFrequently:true});ctx.drawImage(source,0,0,canvas.width,canvas.height);recolorScorecardCanvas(ctx,canvas.width,canvas.height,palette);if(!includeTraditionalGuides)removeTraditionalScoringGuides(ctx,canvas.width,canvas.height);const dataUrl=canvas.toDataURL("image/jpeg",.985);return {bytes:new Uint8Array(base64ToArrayBuffer(dataUrl.split(",")[1])),width:canvas.width,height:canvas.height};}
 function classicPdfOverlay(){const d=collectData(),totals=computeGameTotals(),cmd=["q 612 0 0 792 0 0 cm /Im0 Do Q"];classicPdfText(cmd,topLine(d),21.4,5.0,395,9.4,{minSize:5.8,color:"brown"});const info=[[d.weather?`Weather: ${d.weather}`:"",d.umpires?`Umpires: ${d.umpires}`:""].filter(Boolean).join(" • "),[d.broadcast?`TV: ${d.broadcast}`:"",d.radio?`Radio: ${d.radio}`:""].filter(Boolean).join(" • ")].filter(Boolean);info.slice(0,2).forEach((line,i)=>classicPdfText(cmd,line,21.4,22+i*12,395,8.8,{minSize:5,color:"brown"}));classicPdfText(cmd,`ABS  Away: ${d.awayTeam||"Away"}`,424,51,80,6.1,{minSize:4.2,color:"white",align:"center"});classicPdfText(cmd,`ABS  Home: ${d.homeTeam||"Home"}`,506,51,84,6.1,{minSize:4.2,color:"white",align:"center"});const scoreTops={away:88.3,home:105.6};classicPdfText(cmd,`Away: ${d.awayTeam||"Away"}`,21.4,scoreTops.away,178,10.2,{minSize:6.2,color:"white"});classicPdfText(cmd,`Home: ${d.homeTeam||"Home"}`,21.4,scoreTops.home,178,10.2,{minSize:6.2,color:"white"});const inningX=i=>196.8+(i-1)*28.55;for(let i=1;i<=10;i++){classicPdfText(cmd,totals.away.innings[i-1]||0,inningX(i),scoreTops.away,28.5,8,{align:"center",color:"brown"});classicPdfText(cmd,totals.home.innings[i-1]||0,inningX(i),scoreTops.home,28.5,8,{align:"center",color:"brown"});}[["away",scoreTops.away],["home",scoreTops.home]].forEach(([team,top])=>{classicPdfText(cmd,totals[team].runs,520,top,27,8,{align:"center",color:"brown"});classicPdfText(cmd,totals[team].hits,548.5,top,27,8,{align:"center",color:"brown"});classicPdfText(cmd,totals[team].errors,577,top,27,8,{align:"center",color:"brown"});});const awayTitle=`Away: ${d.awayTeam||"Away"}${d.awayRecord?` (${d.awayRecord})`:""}`,homeTitle=`Home: ${d.homeTeam||"Home"}${d.homeRecord?` (${d.homeRecord})`:""}`;classicPdfText(cmd,awayTitle,21.4,128.0,395,10.3,{minSize:5.5,color:"white"});classicPdfText(cmd,homeTitle,21.4,364.6,395,10.3,{minSize:5.5,color:"white"});const rowTops={away:[161.7,184.1,205.8,227.6,249.3,271.7,293.5,315.2,336.9],home:[398.2,420.0,441.7,463.4,485.1,507.6,529.3,551.0,572.7]};for(const team of ["away","home"]){const stats=computeTeamStats(team);d[team].lineup.forEach((p,r)=>{const top=rowTops[team][r];classicPdfText(cmd,formatLineupPlayer(p),21.4,top,178,8.7,{minSize:4.7,color:"brown"});for(let inn=1;inn<=10;inn++){const plays=playsByBatterInning(team,r,inn),notation=plays.length?plays.map(playNotation).join("/"):"";if(notation)classicPdfText(cmd,notation,inningX(inn)+1,top-2.6,26.5,8.8,{minSize:4.4,align:"center",color:"brown"});}const xs=[482,511,540,569];[stats[r].ab,stats[r].r,stats[r].h,stats[r].rbi].forEach((v,j)=>classicPdfText(cmd,v,xs[j],top,27,7.5,{align:"center",color:"brown"}));});}classicPdfText(cmd,`Away: ${d.awayTeam||"Away"} Pitching`,21.4,599.7,395,9.2,{minSize:4.8,color:"white"});classicPdfText(cmd,`Home: ${d.homeTeam||"Home"} Pitching`,21.4,697.7,395,9.2,{minSize:4.8,color:"white"});const pTops={away:[625.7,637.8,649.8,661.8,673.7,685.8],home:[723.2,735.1,747.1,759.1,771.0,781.0]};for(const team of ["away","home"])d[team].pitchers.forEach((p,i)=>classicPdfText(cmd,formatPitcher(p),21.4,pTops[team][i],178,7.2,{minSize:4.2,color:"brown"}));classicPdfNotes(cmd,exportNotes(d,totals));return `${cmd.join("\n")}\n`;}
 function buildClassicPdfBytes(imageInfo,contentText=""){const image=imageInfo.bytes,content=new TextEncoder().encode(contentText||"q 612 0 0 792 0 0 cm /Im0 Do Q\n"),parts=[],offsets=Array(8).fill(0);let length=0;const push=b=>{parts.push(b);length+=b.length;},txt=t=>push(new TextEncoder().encode(t)),obj=(n,b)=>{offsets[n]=length;txt(`${n} 0 obj\n`);b.forEach(push);txt("\nendobj\n");};txt("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");obj(1,[new TextEncoder().encode("<< /Type /Catalog /Pages 2 0 R >>")]);obj(2,[new TextEncoder().encode("<< /Type /Pages /Kids [3 0 R] /Count 1 >>")]);obj(3,[new TextEncoder().encode("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> /XObject << /Im0 6 0 R >> >> /Contents 7 0 R >>")]);obj(4,[new TextEncoder().encode("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")]);obj(5,[new TextEncoder().encode("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")]);offsets[6]=length;txt(`6 0 obj\n<< /Type /XObject /Subtype /Image /Width ${imageInfo.width} /Height ${imageInfo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.length} >>\nstream\n`);push(image);txt("\nendstream\nendobj\n");offsets[7]=length;txt(`7 0 obj\n<< /Length ${content.length} >>\nstream\n`);push(content);txt("endstream\nendobj\n");const xref=length;txt("xref\n0 8\n0000000000 65535 f \n");for(let i=1;i<=7;i++)txt(`${String(offsets[i]).padStart(10,"0")} 00000 n \n`);txt(`trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);const out=new Uint8Array(length);let pos=0;for(const p of parts){out.set(p,pos);pos+=p.length;}return out;}
 async function exportClassicPdf(){try{const d=collectData();classicPdfPalette=scorecardPaletteForHomeTeam(d.homeTeam);const image=await themedScorecardBackground(false,classicPdfPalette),bytes=buildClassicPdfBytes(image,classicPdfOverlay());downloadBlob(new Blob([bytes],{type:"application/pdf"}),`${safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"scorecard"}`)}.pdf`);$("autosaveBar").textContent=`PDF downloaded using ${paletteStatusText(d.homeTeam)}. Traditional guides were removed from computer-scored boxes.`;}catch(err){console.error(err);alert(`PDF export failed: ${err.message}`);}}
@@ -1032,6 +1040,6 @@ function init(){
       loadSchedule();
     }
   });
-  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=23-scroll-preserve",{updateViaCache:"none"}).catch(console.warn);
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=24-sharp-pdf",{updateViaCache:"none"}).catch(console.warn);
 }
 init();

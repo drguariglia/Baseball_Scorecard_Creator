@@ -22,6 +22,6 @@ assert.match(app,/s\.strikes\+\+/, 'strikes must be counted');
 assert.match(app,/s\.fouls\+\+/, 'fouls must be counted');
 assert.match(app,/s\.walks\+\+/, 'walks must be counted');
 assert.match(app,/s\.hitBatters\+\+/, 'hit batters must be counted');
-assert.match(app,/version:VERSION_NUMBER/, 'saved game files must identify Version 23');
+assert.match(app,/version:VERSION_NUMBER/, 'saved game files must identify Version 24');
 assert.match(css,/\.pitcher-tracking-summary/, 'Pitch Tracking section must have responsive styling');
 console.log('permanent pitch tracking tests passed');

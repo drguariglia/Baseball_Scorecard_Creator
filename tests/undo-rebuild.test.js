@@ -16,6 +16,6 @@ assert.match(app, /scoring\.pitchLog=scoring\.pitchLog\.filter\(event=>event\.se
 assert.match(app, /deletePlay\(id\)[\s\S]*rebuildDerivedGameState\(\);[\s\S]*refreshAll\(\)/, 'every play deletion must rebuild all counters and displays');
 assert.match(app, /rebuildDerivedGameState\(\);refreshAll\(\);scheduleAutosave\(existing\?"Play updated and all game counters rebuilt"/, 'editing a saved play must also rebuild all counters and displays');
 assert.match(app, /defaultDetails\(\$\("playOutcome"\)\.value,team,idx,existing\?\.beforeState\?\.bases\|\|null,existing\?\.beforeState\?\.outs\?\?null\)/, 'editing a historical outcome must use that play’s rebuilt base state');
-assert.match(html, /app\.js\?v=23-scroll-preserve/, 'undo-rebuild JavaScript must be cache-busted');
-assert.match(worker, /guariglia-scorecard-v23-scroll-preserve/, 'service-worker cache must be bumped for the undo fix');
+assert.match(html, /app\.js\?v=24-sharp-pdf/, 'undo-rebuild JavaScript must be cache-busted');
+assert.match(worker, /guariglia-scorecard-v24-sharp-pdf/, 'service-worker cache must be bumped for the undo fix');
 console.log('undo and full-state rebuild tests passed');

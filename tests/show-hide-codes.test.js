@@ -18,7 +18,7 @@ assert.match(app, /function toggleQuickResults\(\)[\s\S]*setQuickResultsVisible\
 assert.match(app, /if\(type==="inplay"\)setQuickResultsVisible\(true\)/, 'ball in play must reopen the codes through the same helper');
 assert.match(app, /renderQuickResults\(\);[\s\S]*setQuickResultsVisible\(true\);[\s\S]*initEvents\(\)/, 'the panel must initialize in the visible state');
 assert.match(css, /\.quick-result-grid\[hidden\],\.quick-result-grid\.is-collapsed\{display:none!important\}/, 'collapsed codes must be visually removed in every browser');
-assert.match(html, /styles\.css\?v=23-scroll-preserve/, 'updated stylesheet must be cache-busted');
-assert.match(html, /app\.js\?v=23-scroll-preserve/, 'updated JavaScript must be cache-busted');
+assert.match(html, /styles\.css\?v=24-sharp-pdf/, 'updated stylesheet must be cache-busted');
+assert.match(html, /app\.js\?v=24-sharp-pdf/, 'updated JavaScript must be cache-busted');
 
 console.log('show/hide codes tests passed');

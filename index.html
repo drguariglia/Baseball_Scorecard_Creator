@@ -7,16 +7,16 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Guariglia Scorecard" />
-  <title>Guariglia Baseball Scorecard Builder</title>
+  <title>Guariglia Baseball Scorecard Builder - Version 24</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=23-scroll-preserve" />
+  <link rel="stylesheet" href="styles.css?v=24-sharp-pdf" />
 </head>
 <body>
   <header class="hero no-print">
     <div class="hero-brand">
       <div class="brand-mark-wrap"><img class="brand-mark" src="assets/guariglia-crest.gif" alt="Guariglia crest" /></div>
       <div class="hero-copy">
-        <p class="eyebrow">Guariglia company app • Version 23</p>
+        <p class="eyebrow">Guariglia company app • Version 24</p>
         <h1>Baseball Scorecard Builder & Live Scorer</h1>
         <p class="subtitle">Build the scorecard, score every plate appearance from a phone or desktop, and export the finished game.</p>
       </div>
@@ -237,7 +237,7 @@
     <section id="settings" class="panel">
       <div class="panel-title-row"><div><p class="section-kicker">App settings</p><h2>Template, transfer, and installation</h2></div></div>
       <div class="settings-grid">
-        <article class="entry-card"><h3>Blank scorecards</h3><p>Download the Excel template or create a one-page blank PDF using the selected home team’s color palette.</p><label>Upload a newer blank template<input id="templateFile" type="file" accept=".xlsx,.xlsm" /></label><p id="templateStatus" class="small-note">Using the built-in blank scorecard.</p><div class="stack-buttons"><button id="downloadBlankBtn" class="secondary full-width" type="button">Download Blank Excel</button><button id="downloadBlankPdfBtn" class="secondary full-width" type="button">Download Blank PDF</button></div></article>
+        <article class="entry-card"><h3>Blank scorecards</h3><p>The completed-game PDF uses the selected home MLB team’s colors and clean computer scoring boxes. Blank PDFs let you choose whether to retain the traditional plus signs and 2×3 ball-strike guides.</p><button id="downloadBlankPdfBtn" class="primary full-width" type="button">Download Blank PDF</button><label>Upload a newer Excel template<input id="templateFile" type="file" accept=".xlsx,.xlsm" /></label><p id="templateStatus" class="small-note">Using the built-in blank Excel scorecard.</p><button id="downloadBlankBtn" class="secondary full-width" type="button">Download Blank Excel</button></article>
         <article class="entry-card"><h3>Move a game between devices</h3><p>Save a game file on one device and open it on the other. All lineups, scoring, notes, and totals are included.</p><div class="stack-buttons"><button id="saveGameFileBtn2" class="secondary" type="button">Save Game File</button><label class="button secondary file-button">Open Game File<input id="openGameFile2" type="file" accept=".json,.scoregame" /></label></div></article>
         <article class="entry-card"><h3>Install on iPhone</h3><p>Open the Netlify site in Safari, tap Share, then choose <strong>Add to Home Screen</strong>.</p><button id="installBtn" class="secondary full-width" type="button" hidden>Install App</button></article>
       </div>
@@ -246,7 +246,7 @@
 
   <dialog id="playDialog" class="play-dialog no-print">
     <form method="dialog" id="playForm">
-      <div class="dialog-header"><div><p class="section-kicker">Plate appearance details</p><h2 id="dialogTitle">Record Play</h2></div><button id="closePlayDialogBtn" class="icon-button" value="cancel" aria-label="Close" type="button">×</button></div>
+      <div class="dialog-header"><div><p class="section-kicker">Plate appearance details</p><h2 id="dialogTitle">Record Play</h2></div><button id="closePlayDialogBtn" class="icon-button" value="cancel" type="button" aria-label="Close">×</button></div>
       <input id="dialogTeam" type="hidden" /><input id="dialogPlayerIndex" type="hidden" /><input id="dialogPaIndex" type="hidden" /><input id="dialogPlayId" type="hidden" />
       <div class="form-grid two-col">
         <label>Result<select id="playOutcome"></select></label>
@@ -272,11 +272,11 @@
 
   <dialog id="blankPdfDialog" class="play-dialog blank-pdf-choice no-print">
     <form method="dialog">
-      <div class="dialog-header"><div><p class="section-kicker">Blank scorecard PDF</p><h2>Choose the scoring-box style</h2></div><button class="icon-button" value="cancel" aria-label="Close" type="submit">×</button></div>
-      <p>The completed computer-scored PDF always uses clean boxes. For a blank printable scorecard, choose whether to retain the traditional plus signs and 2×3 ball-strike counters.</p>
+      <div class="dialog-header"><div><p class="section-kicker">Blank PDF option</p><h2>Include traditional scoring guides?</h2></div><button class="icon-button" value="cancel" type="submit" aria-label="Close">×</button></div>
+      <p>The blank PDF keeps the exact classic scorecard format. Choose whether each scoring square should include the small plus sign and 2×3 ball-strike counter.</p>
       <div class="choice-grid">
-        <button id="blankPdfWithGuidesBtn" class="secondary choice-card" type="button"><strong>Include Traditional Guides</strong><span>Keep the plus signs and 2×3 counters for handwritten scoring.</span></button>
-        <button id="blankPdfCleanBtn" class="primary choice-card" type="button"><strong>Use Clean Boxes</strong><span>Remove the plus signs and counters from the blank PDF.</span></button>
+        <button id="blankPdfWithGuidesBtn" class="secondary choice-card" type="button"><strong>Include Traditional Guides</strong><span>Print the plus sign and 2×3 ball-strike counter in every blank scoring box.</span></button>
+        <button id="blankPdfCleanBtn" class="primary choice-card" type="button"><strong>Use Clean Boxes</strong><span>Print empty scoring boxes with no plus signs or counters.</span></button>
       </div>
       <div class="dialog-actions"><span class="spacer"></span><button class="secondary" value="cancel" type="submit">Cancel</button></div>
     </form>
@@ -286,8 +286,8 @@
 
   <script src="vendor/jszip.min.js"></script>
   <script src="template_data.js"></script>
-  <script src="pdf_background_data.js?v=23-home-team-pdf"></script>
-  <script src="baseball-data.js?v=23"></script>
-  <script src="app.js?v=23-scroll-preserve"></script>
+  <script src="pdf_background_data.js?v=24-sharp-pdf"></script>
+  <script src="baseball-data.js?v=24"></script>
+  <script src="app.js?v=24-sharp-pdf"></script>
 </body>
 </html>

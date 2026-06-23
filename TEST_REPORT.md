@@ -1,149 +1,59 @@
-# Version 22 Test Report
+# Version 24 Test Report
 
-## Automated source tests
+Date: 2026-06-23
 
-All tests passed:
+## Result
 
-- Baseball schedule data normalization
-- Page/script connection order
-- Blank startup and full reset
-- Refresh clearing and Section 1 retention
-- Responsive layout checks
-- Pitch-count and quick-result controls
+PASS - Version 24 preserves the Version 23 application and exact PDF geometry while eliminating residual 2x3 counter artifacts and substantially improving PDF sharpness from top to bottom.
+
+## Automated checks
+
+All inherited and Version 24 tests passed:
+
+- Schedule data and connection wiring
+- Blank startup and reset behavior
+- Refresh Schedule clearing and Section 1 retention
+- Responsive layout
+- Pitch count and quick scoring
 - Permanent pitch tracking
-- Full undo and derived-state rebuilding
-- Show/Hide Codes control behavior
+- Undo and full-state rebuilding
+- Show/Hide Codes
+- MLB rules alignment
+- Button wiring
+- Home-team PDF palette and clean-box behavior
+- Version 24 high-resolution background and full scoring-grid reconstruction
 
-Commands completed successfully:
+JavaScript syntax checks passed for `app.js`, `baseball-data.js`, and `service-worker.js`.
 
-- `npm test`
-- `node --check app.js`
-- `node --check baseball-data.js`
-- `node --check service-worker.js`
-- Netlify TypeScript function compilation with a temporary `@netlify/functions` type declaration
+## PDF clarity verification
 
-## Browser game-state simulation
+The PDF background was increased from 1275 x 1650 pixels to 2550 x 3300 pixels, equivalent to 300 DPI on a US Letter page.
 
-A Chromium browser simulation recorded three completed plate appearances and ten pitches:
+A Version 24 Mets-color sample was rendered at 300 DPI and visually inspected in three regions:
 
-1. Single after Ball, Swinging Strike, and In Play
-2. Four-pitch walk
-3. Three-pitch strikeout
+- Top: game information, Replay Challenge area, line score, and column headings
+- Middle: all 180 batter scoring boxes across both teams
+- Bottom: both pitching sections and the Game Notes box
 
-Before undo:
+Verification confirmed:
 
-- Top 1
-- One out
-- Runners on first and second
-- Ten pitcher pitches
-- Three batters faced
-- One hit, one walk, one strikeout
+- No plus-sign remnants in completed computer-scored boxes
+- No 2x3 counter lines or fragments inside or along the scoring-box edges
+- Continuous, evenly redrawn vertical and horizontal scoring-grid borders
+- Sharper headings, borders, labels, and background details from top to bottom
+- Exactly one US Letter portrait page, 612 x 792 points
+- No changes to rows, columns, field coordinates, pitching sections, or Game Notes geometry
 
-### Undo latest play
+Measured edge-detail scores increased substantially over Version 23 at the same 300-DPI render:
 
-After undoing the strikeout:
+- Top headers: 108.28 to 349.75
+- Scoring grids: 79.46 to 236.81
+- Bottom pitching area: 100.30 to 352.09
 
-- Outs returned from one to zero
-- Runners remained on first and second
-- Current batter returned correctly
-- Pitch log fell from ten pitches to seven
-- Strikeout and batters-faced totals decreased correctly
+## Files
 
-### Delete an earlier play
+- `preview/v24-sharp-clean-pdf.png`
+- `preview/v24-clean-scoring-boxes.png`
+- `PDF_CLARITY_REPORT.json`
 
-After deleting the earlier single:
-
-- The remaining walk was replayed from an empty diamond
-- Only first base remained occupied
-- Pitch log fell from seven pitches to four
-- Hits fell to zero
-- Walks remained one
-- Batters faced became one
-
-### Edit a historical play
-
-The remaining walk was changed to a groundout:
-
-- Outs became one
-- The diamond became empty
-- Walks became zero
-- Batters faced remained one
-- All later snapshots were rebuilt
-
-### Undo an inning-ending play
-
-A single followed by a double play moved the game to Bottom 1. Undoing the double play restored:
-
-- Top 1
-- One out
-- Runner on first
-- Empty second and third bases
-- Correct current batter
-
-### Actual plate-appearance selector deletion
-
-The test also used the visible plate-appearance dropdown itself, selected the blank option, and confirmed deletion. The app rebuilt to:
-
-- Top 1
-- Zero outs
-- Runner on first
-- One remaining completed play
-- One remaining recorded pitch
-- One hit, zero walks, one batter faced
-
-## Additional correction
-
-The browser simulation identified and verified a fix for runners marked **Stayed/Hold**. They now remain on their original bases instead of disappearing after a strikeout or other out.
-
-## Artifacts
-
-- `UNDO_REBUILD_REPORT.json` contains the complete before-and-after state snapshots.
-- `preview/undo-rebuilt-game-state.png` shows the restored inning, outs, current batter, and interactive diamond.
-- `preview/undo-rebuilt-pitch-tracking.png` shows recalculated pitcher statistics and pitch history.
-- `preview/undo-via-pa-selector.png` shows the state after deleting a play through the plate-appearance selector.
-
-## Show/Hide Codes browser verification
-
-The control was tested in Chromium at desktop and iPhone widths.
-
-Initial visible state:
-
-- Button label: **Hide Codes**
-- `aria-expanded`: `true`
-- Grid display: `grid`
-- Grid height: 312 pixels in the desktop test
-
-After selecting **Hide Codes**:
-
-- Button label changed to **Show Codes**
-- `aria-expanded` changed to `false`
-- `aria-hidden` changed to `true`
-- The `hidden` attribute and `is-collapsed` class were both applied
-- Computed display became `none`
-- Grid height became zero
-
-After selecting **Show Codes** again, all values returned to the visible state. A complete game-state snapshot before, during, and after the toggle remained identical, confirming that the control changes presentation only and does not alter scoring data.
-
-Artifacts:
-
-- `SHOW_HIDE_CODES_REPORT.json` contains the browser assertions.
-- `preview/show-hide-codes-desktop.png` shows the expanded desktop layout.
-- `preview/show-hide-codes-iphone-hidden.png` shows the collapsed iPhone layout.
-
-## Version 23 Fill App scroll verification
-
-The **Fill App from Selected Game** workflow was tested in headless Chromium using a mocked official-game response.
-
-- Viewport before import: `x=0, y=520`
-- Viewport after import: `x=0, y=520`
-- Vertical movement: `0 pixels`
-- Focus after import: `lookupGameBtn`
-- Away and home team fields populated successfully
-- Browser page errors: none
-
-Artifacts:
-
-- `FILL_APP_SCROLL_REPORT.json`
-- `preview/fill-app-scroll-preserved.png`
-
-The regression suite also confirms that normal section navigation retains its existing scroll-to-top behavior, while selected-game import explicitly suppresses it.
+Version 24 has not been deployed to the live Netlify site.

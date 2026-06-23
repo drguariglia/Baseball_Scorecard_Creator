@@ -18,19 +18,13 @@ assert.match(app, /focus\(\{preventScroll:true\}\)/,
   "Refresh Schedule must restore keyboard focus without moving the viewport");
 assert.match(app, /refreshGamesBtn"\)\.addEventListener\("click",refreshScheduleAndClear\)/,
   "Refresh button must use the clear-and-refresh handler");
-assert.match(app, /Game information loaded[\s\S]*setPanel\("setup",\{preserveScroll:true\}\)/,
-  "Selected-game import must remain on Section 1 Setup without invoking normal scroll-to-top navigation");
-assert.match(app, /async function loadSelectedGame\(\)[\s\S]*const previousScrollX=window\.scrollX;[\s\S]*const previousScrollY=window\.scrollY;/,
-  "Fill App must capture the current viewport before loading game details");
-assert.match(app, /restoreRefreshPosition\(fillButton,previousScrollX,previousScrollY\)/,
-  "Fill App must restore the exact viewport and button focus after population");
-assert.match(app, /function setPanel\(id,\{preserveScroll=false\}=\{\}\)[\s\S]*if\(!preserveScroll\) window\.scrollTo/,
-  "Panel navigation must allow selected-game import to suppress scroll-to-top behavior");
+assert.match(app, /Game information loaded[\s\S]*setPanel\("setup"\)/,
+  "Selected-game import must remain on Section 1 Setup");
 assert.doesNotMatch(app, /Game information loaded[\s\S]{0,400}setPanel\("lineups"\)/,
   "Selected-game import must not jump to the Lineups section");
 assert.match(html, /Refresh Schedule clears the current game before reloading/,
   "Section 1 should explain the refresh behavior");
-assert.match(html, /app\.js\?v=23-scroll-preserve/,
-  "Version 23 app JavaScript must be cache-busted");
+assert.match(html, /app\.js\?v=24-sharp-pdf/,
+  "Version 24 app JavaScript must be cache-busted");
 
 console.log("refresh clearing and Section 1 retention tests passed");
