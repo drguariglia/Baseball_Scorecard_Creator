@@ -3,6 +3,7 @@ import type { Config, Context } from "@netlify/functions";
 const MLB_ORIGIN = "https://statsapi.mlb.com";
 const API = `${MLB_ORIGIN}/api`;
 const REQUEST_TIMEOUT_MS = 12000;
+const MAX_PITCHERS = 15;
 const LEVELS: Record<string, number[]> = {
   mlb: [1],
   "all-pro": [1, 11, 12, 13, 14, 16],
@@ -30,7 +31,7 @@ async function getJson(url: string, attempts = 2) {
       const response = await fetch(url, {
         headers: {
           Accept: "application/json",
-          "User-Agent": "Guariglia-Baseball-Scorecard/22"
+          "User-Agent": "Guariglia-Baseball-Scorecard/27.1"
         },
         signal: controller.signal
       });
@@ -118,51 +119,148 @@ function playerFromBox(boxTeam: any, id: number) {
   return boxTeam?.players?.[`ID${id}`] || null;
 }
 
-function battingLineup(boxTeam: any) {
+function seasonStat(person: any, groupName: string) {
+  const groups = Array.isArray(person?.stats) ? person.stats : [];
+  const match = groups.find((item: any) => {
+    const group = item?.group?.displayName || item?.group?.name || item?.group;
+    return String(group || "").toLowerCase() === groupName.toLowerCase();
+  });
+  return match?.splits?.[0]?.stat || {};
+}
+
+function peopleLookup(payload: any) {
+  return Object.fromEntries((payload?.people || []).filter((person: any) => person?.id).map((person: any) => [person.id, person]));
+}
+
+function rosterEntries(payload: any) {
+  return Array.isArray(payload?.roster) ? payload.roster : [];
+}
+
+function rosterPersonIds(rosters: Record<string, any> = {}) {
+  return [...new Set(["away", "home"].flatMap(side => rosterEntries(rosters?.[side]).map((entry: any) => entry?.person?.id).filter(Boolean)))];
+}
+
+function pitcherHand(value: any) {
+  const code = String(value || "").trim().toUpperCase();
+  if (!code) return "";
+  return code.endsWith("HP") ? code : `${code}HP`;
+}
+
+function rosterEntryById(rosterPayload: any, id: number) {
+  return rosterEntries(rosterPayload).find((entry: any) => Number(entry?.person?.id) === Number(id)) || null;
+}
+
+function collectGamePersonIds(feed: any, schedulePayload: any, rosters: Record<string, any> = {}) {
+  const box = feed?.liveData?.boxscore || {};
+  const scheduleGame = schedulePayload?.dates?.[0]?.games?.[0] || {};
+  const ids: number[] = [];
+  for (const side of ["away", "home"] as const) {
+    const team = box?.teams?.[side] || {};
+    ids.push(...(team.battingOrder || []), ...(team.pitchers || []), ...Object.values(team.players || {}).map((entry: any) => entry?.person?.id).filter(Boolean));
+    const probable = scheduleGame?.teams?.[side]?.probablePitcher?.id;
+    if (probable) ids.push(probable);
+  }
+  ids.push(...rosterPersonIds(rosters));
+  return [...new Set(ids.filter(Boolean))];
+}
+
+function battingLineup(boxTeam: any, people: Record<number, any> = {}) {
   const order: number[] = boxTeam?.battingOrder || [];
   return order.slice(0, 9).map(id => {
     const entry = playerFromBox(boxTeam, id) || {};
-    const person = entry.person || {};
-    const batting = entry.seasonStats?.batting || {};
+    const detail = people[id] || {};
+    const person = entry.person || detail || {};
+    const batting = entry.seasonStats?.batting || seasonStat(detail, "hitting") || {};
     return {
-      num: entry.jerseyNumber || "",
-      name: person.fullName || "",
-      pos: entry.position?.abbreviation || "",
-      bats: entry.batSide?.code || "",
+      num: entry.jerseyNumber || detail.primaryNumber || "",
+      name: person.fullName || detail.fullName || "",
+      pos: entry.position?.abbreviation || detail.primaryPosition?.abbreviation || "",
+      bats: entry.batSide?.code || detail.batSide?.code || "",
       avg: batting.avg || "",
       obp: batting.obp || ""
     };
   });
 }
 
-function probablePitcher(game: any, side: "away" | "home") {
-  const pitcher = game?.teams?.[side]?.probablePitcher;
-  if (!pitcher?.fullName) return null;
-  return { num: "", name: pitcher.fullName, throws: "", record: "", era: "", k: "" };
+function benchList(boxTeam: any, people: Record<number, any> = {}, rosterPayload: any = {}) {
+  const starters = new Set((boxTeam?.battingOrder || []).map(Number));
+  const gamePitchers = new Set((boxTeam?.pitchers || []).map(Number));
+  const entries = new Map<number, any>();
+  Object.values(boxTeam?.players || {}).forEach((entry: any) => { const id=Number(entry?.person?.id); if(id)entries.set(id,entry); });
+  rosterEntries(rosterPayload).forEach((entry: any) => { const id=Number(entry?.person?.id); if(id&&!entries.has(id))entries.set(id,entry); });
+  return [...entries.entries()].map(([id,entry]) => {
+    const detail = people[id] || {};
+    const person = entry?.person || detail || {};
+    const position = entry?.position || detail.primaryPosition || {};
+    const batting = entry?.seasonStats?.batting || seasonStat(detail, "hitting") || {};
+    return {
+      id,
+      num: entry?.jerseyNumber || detail.primaryNumber || "",
+      name: person.fullName || detail.fullName || "",
+      pos: position.abbreviation || "",
+      positionType: position.type || "",
+      bats: entry?.batSide?.code || detail.batSide?.code || "",
+      avg: batting.avg || "",
+      obp: batting.obp || ""
+    };
+  }).filter(player => player.id && !starters.has(Number(player.id)) && !gamePitchers.has(Number(player.id)) && String(player.positionType).toLowerCase() !== "pitcher" && String(player.pos).toUpperCase() !== "P" && player.name).slice(0,10).map(({positionType,...player})=>player);
 }
 
-function pitcherList(boxTeam: any, scheduleGame: any, side: "away" | "home") {
-  const ids: number[] = boxTeam?.pitchers || [];
-  const pitchers = ids.slice(0, 6).map(id => {
-    const entry = playerFromBox(boxTeam, id) || {};
-    const person = entry.person || {};
-    const pitching = entry.seasonStats?.pitching || {};
-    const hand = entry.pitchHand?.code ? `${entry.pitchHand.code}HP` : "";
+function probablePitcher(game: any, side: "away" | "home", people: Record<number, any> = {}) {
+  const pitcher = game?.teams?.[side]?.probablePitcher;
+  if (!pitcher?.id && !pitcher?.fullName) return null;
+  const detail = people[pitcher.id] || {};
+  const pitching = seasonStat(detail, "pitching");
+  const recordText = pitching.wins != null && pitching.losses != null ? `${pitching.wins}-${pitching.losses}` : "";
+  return { id:pitcher.id||detail.id||"", num: detail.primaryNumber || "", name: pitcher.fullName || detail.fullName || "", throws: pitcherHand(detail.pitchHand?.code), record: recordText, era: pitching.era || "", k: pitching.strikeOuts != null ? String(pitching.strikeOuts) : "" };
+}
+
+function pitcherAlphabeticalParts(pitcher: any = {}) {
+  const raw=String(pitcher?.name||"").trim().replace(/\s+/g," ");
+  if(!raw)return {last:"",first:"",number:String(pitcher?.num||"")};
+  const comma=raw.match(/^([^,]+),\s*(.+)$/);
+  if(comma)return {last:comma[1].trim(),first:comma[2].trim(),number:String(pitcher?.num||"")};
+  const words=raw.split(" ");
+  while(words.length>1&&/^(jr\.?|sr\.?|ii|iii|iv|v)$/i.test(words.at(-1)))words.pop();
+  const last=words.pop()||"";
+  return {last,first:words.join(" "),number:String(pitcher?.num||"")};
+}
+
+function comparePitchersAlphabetically(a: any,b: any){
+  const left=pitcherAlphabeticalParts(a),right=pitcherAlphabeticalParts(b),compare=(x:any,y:any)=>String(x||"").localeCompare(String(y||""),"en",{sensitivity:"base",numeric:true});
+  return compare(left.last,right.last)||compare(left.first,right.first)||compare(left.number,right.number);
+}
+
+function pitcherList(boxTeam: any, scheduleGame: any, side: "away" | "home", people: Record<number, any> = {}, rosterPayload: any = {}) {
+  const ids: number[] = [], seen = new Set<number>();
+  const add = (id: any) => { const value=Number(id); if(value&&!seen.has(value)){seen.add(value);ids.push(value);} };
+  add(scheduleGame?.teams?.[side]?.probablePitcher?.id);
+  (boxTeam?.pitchers || []).forEach(add);
+  rosterEntries(rosterPayload).forEach((entry: any) => {
+    const position = entry?.position || people[entry?.person?.id]?.primaryPosition || {};
+    if(String(position?.type||"").toLowerCase()==="pitcher"||String(position?.abbreviation||"").toUpperCase()==="P")add(entry?.person?.id);
+  });
+  const probableId=Number(scheduleGame?.teams?.[side]?.probablePitcher?.id||0);
+  const pitchers = ids.map(id => {
+    const entry = playerFromBox(boxTeam,id) || rosterEntryById(rosterPayload,id) || {};
+    const detail = people[id] || {};
+    const person = entry.person || detail || {};
+    const pitching = entry.seasonStats?.pitching || seasonStat(detail,"pitching") || {};
     const recordText = pitching.wins != null && pitching.losses != null ? `${pitching.wins}-${pitching.losses}` : "";
     return {
-      num: entry.jerseyNumber || "",
-      name: person.fullName || "",
-      throws: hand,
+      id,
+      num: entry.jerseyNumber || detail.primaryNumber || "",
+      name: person.fullName || detail.fullName || "",
+      throws: pitcherHand(entry.pitchHand?.code || detail.pitchHand?.code),
       record: recordText,
       era: pitching.era || "",
       k: pitching.strikeOuts != null ? String(pitching.strikeOuts) : ""
     };
-  });
-  if (!pitchers.length) {
-    const probable = probablePitcher(scheduleGame, side);
-    if (probable) pitchers.push(probable);
-  }
-  return pitchers;
+  }).filter(pitcher=>pitcher.name||pitcher.num);
+  if(!pitchers.length){const probable=probablePitcher(scheduleGame,side,people);if(probable)pitchers.push(probable);}
+  const probable=pitchers.find(pitcher=>Number(pitcher.id)===probableId)||null;
+  const alphabetical=pitchers.filter(pitcher=>!probable||Number(pitcher.id)!==Number(probable.id)).sort(comparePitchersAlphabetically);
+  return [...(probable?[probable]:[]),...alphabetical].slice(0,MAX_PITCHERS);
 }
 
 function officialLabel(official: any) {
@@ -196,11 +294,28 @@ async function gameDetails(gamePk: string) {
   const scheduleGame = schedulePayload?.dates?.[0]?.games?.[0] || {};
   const awayTeam = gd.teams?.away || scheduleGame?.teams?.away?.team || {};
   const homeTeam = gd.teams?.home || scheduleGame?.teams?.home?.team || {};
+  const officialDate = gd.datetime?.officialDate || scheduleGame?.officialDate || schedulePayload?.dates?.[0]?.date || "";
+  const rosters: Record<string, any> = {away:null,home:null};
+  await Promise.allSettled((["away","home"] as const).map(async side=>{
+    const teamId=gd.teams?.[side]?.id||scheduleGame?.teams?.[side]?.team?.id;if(!teamId)return;
+    rosters[side]=await getJson(`${API}/v1/teams/${encodeURIComponent(teamId)}/roster?rosterType=active${officialDate?`&date=${encodeURIComponent(officialDate)}`:""}`);
+  }));
   const weather = gd.weather || {};
   const broadcasts = broadcastLists(schedulePayload);
+  let people: Record<number, any> = {};
+  try {
+    const ids = collectGamePersonIds(feed, schedulePayload, rosters);
+    if (ids.length) {
+      const payload = await getJson(`${API}/v1/people?personIds=${ids.join(",")}&hydrate=currentTeam,stats(group=[hitting,pitching],type=[season])`);
+      people = peopleLookup(payload);
+    }
+  } catch (error) {
+    console.warn("Player season-stat enrichment was unavailable.", error);
+  }
   const weatherParts = [weather.temp != null ? `${weather.temp}°F` : "", weather.condition, weather.wind].filter(Boolean);
-  const officialDate = gd.datetime?.officialDate || scheduleGame?.officialDate || schedulePayload?.dates?.[0]?.date || "";
   const dateTime = gd.datetime?.dateTime || scheduleGame?.gameDate;
+  const gameType = gd.game?.type || scheduleGame?.gameType || "R";
+  const extraInningsRule = ["F","D","L","W","C","P"].includes(gameType) ? "standard" : "automatic-runner";
   const data = {
     awayTeam: awayTeam.name || scheduleGame?.teams?.away?.team?.name || "",
     homeTeam: homeTeam.name || scheduleGame?.teams?.home?.team?.name || "",
@@ -210,18 +325,21 @@ async function gameDetails(gamePk: string) {
     gameTime: timeLabel(dateTime),
     venue: gd.venue?.name || scheduleGame?.venue?.name || "",
     gameNumber: "",
+    extraInningsRule,
     weather: weatherParts.join(", "),
     umpires: (box.officials || []).map(officialLabel).join("; "),
     broadcast: broadcasts.tv,
     radio: broadcasts.radio,
     gameNotes: "",
     away: {
-      lineup: battingLineup(box.teams?.away),
-      pitchers: pitcherList(box.teams?.away, scheduleGame, "away")
+      lineup: battingLineup(box.teams?.away, people),
+      bench: benchList(box.teams?.away, people, rosters.away),
+      pitchers: pitcherList(box.teams?.away, scheduleGame, "away", people, rosters.away)
     },
     home: {
-      lineup: battingLineup(box.teams?.home),
-      pitchers: pitcherList(box.teams?.home, scheduleGame, "home")
+      lineup: battingLineup(box.teams?.home, people),
+      bench: benchList(box.teams?.home, people, rosters.home),
+      pitchers: pitcherList(box.teams?.home, scheduleGame, "home", people, rosters.home)
     }
   };
   return { gamePk, data, status: gd.status?.detailedState || "", source: "app data service" };
@@ -246,7 +364,7 @@ export default async (req: Request, _context: Context) => {
     if (endpoint) return await legacyProxy(endpoint);
 
     const action = url.searchParams.get("action") || "schedule";
-    if (action === "health") return json({ ok: true, version: 15, source: "app data service" }, 200, "no-store");
+    if (action === "health") return json({ ok: true, version: "27.1", source: "app data service" }, 200, "no-store");
     if (action === "schedule") {
       const date = url.searchParams.get("date");
       if (!date) return json({ error: "A date is required" }, 400, "no-store");

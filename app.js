@@ -267,11 +267,44 @@ function comparePitchersAlphabetically(a,b){
 }
 function pitcherRosterKey(p){return [String(p?.num||"").replace(/^#/,""),String(p?.name||"").trim().toLowerCase()].join("|");}
 function scorecardPitchersForTeam(team){
-  const data=collectData(),all=data[team]?.pitchers||[],selected=[],seen=new Set();
+  const data=collectData(),all=data[team]?.pitchers||[],selected=[],seen=new Set(),timeline=[];
+  const mergePitcher=(base={},overlay={})=>{
+    const merged={...base};
+    for(const [key,value] of Object.entries(overlay||{}))if(value!==undefined&&value!==null&&String(value)!=="")merged[key]=value;
+    return merged;
+  };
+  const rosterPitcher=(candidate={})=>{
+    const row=Number.isInteger(candidate.row)?candidate.row:Number.isInteger(candidate.pitcherRow)?candidate.pitcherRow:Number.isInteger(candidate.incomingRow)?candidate.incomingRow:-1;
+    const embedded=typeof candidate.pitcher==="object"&&candidate.pitcher?candidate.pitcher:typeof candidate.incoming==="object"&&candidate.incoming?candidate.incoming:candidate;
+    const snapshot=mergePitcher(embedded,{num:candidate.pitcherNumber||embedded?.num||"",name:candidate.pitcherName||(typeof candidate.pitcher==="string"?candidate.pitcher:embedded?.name)||"",throws:embedded?.throws||"",record:embedded?.record||"",era:embedded?.era||"",k:embedded?.k||""});
+    let roster=row>=0&&row<all.length?all[row]:null;
+    if(!roster){
+      const key=String(candidate.key||candidate.pitcherKey||"");
+      if(key)roster=all.find((pitcher,index)=>pitcherKey(team,index,pitcher.name)===key)||null;
+    }
+    if(!roster&&(snapshot?.name||snapshot?.num)){
+      const target=pitcherRosterKey(snapshot),targetName=String(snapshot?.name||"").trim().toLowerCase();
+      roster=all.find(pitcher=>pitcherRosterKey(pitcher)===target)||(targetName?all.find(pitcher=>String(pitcher?.name||"").trim().toLowerCase()===targetName):null)||null;
+    }
+    return mergePitcher(roster||{},snapshot||{});
+  };
+  const addTimeline=(candidate,kind,order=0)=>{
+    const pitcher=rosterPitcher(candidate);if(!(pitcher.name||pitcher.num))return;
+    const recordedAt=String(candidate?.recordedAt||"");
+    const timestamp=Date.parse(recordedAt);
+    timeline.push({pitcher,inning:Math.max(0,num(candidate?.inning)),half:candidate?.half==="bottom"?1:0,timestamp:Number.isFinite(timestamp)?timestamp:0,kind,order:num(order)});
+  };
+  for(const event of scoring.pitchLog||[])if((event.pitchingTeam||defensiveTeamForBattingTeam(event.battingTeam))===team)addTimeline(event,"pitch",event.seq);
+  for(const play of scoring.plays||[])if((play.pitchingTeam||defensiveTeamForBattingTeam(play.team))===team)addTimeline(play,"play",play.seq);
+  for(const event of scoring.pitcherChanges||[])if(event.team===team)addTimeline({...event,...(event.incoming||{}),pitcher:event.incoming,row:event.incomingRow},"change",event.seq);
+  const kindOrder={change:0,pitch:1,play:2};
+  timeline.sort((a,b)=>a.inning-b.inning||a.half-b.half||((a.timestamp&&b.timestamp)?a.timestamp-b.timestamp:0)||(kindOrder[a.kind]-kindOrder[b.kind])||a.order-b.order);
   const add=p=>{const key=pitcherRosterKey(p);if(!(p?.name||p?.num)||seen.has(key))return;seen.add(key);selected.push({...p});};
-  add(all[0]);
-  [...(scoring.pitcherChanges||[])].filter(event=>event.team===team).sort((a,b)=>num(a.seq)-num(b.seq)).forEach(event=>add(event.incoming));
-  all.forEach(add);
+  timeline.forEach(item=>add(item.pitcher));
+  if(!selected.length){
+    const current=Math.max(0,Math.min(PITCHER_ROWS-1,num(scoring.activePitchers?.[team])));
+    add(all[current]||all[0]);
+  }
   return selected.slice(0,SCORECARD_PITCHER_ROWS);
 }
 function playerIdentity(player,team="",prefix="player"){
@@ -430,7 +463,8 @@ function pitchSequenceLabel(history=[]){
 }
 function outcomeCodeHtml(outcomeId,code=""){
   const text=code||OUTCOME_MAP[outcomeId]?.code||outcomeId;
-  return outcomeId==="KL"?`<span class="mirrored-k-inline" aria-label="Strikeout looking">K</span>`:escapeHtml(text);
+  const mirrored=outcomeId==="KL";
+  return `<strong class="quick-code-symbol${mirrored?" is-mirrored-k":""}"${mirrored?' aria-label="Strikeout looking"':''}>${escapeHtml(mirrored?"K":text)}</strong>`;
 }
 function liveBatterPlateAppearances(team,index){
   return scoring.plays.filter(play=>play.team===team&&play.playerIndex===index).sort((a,b)=>a.seq-b.seq);
@@ -454,7 +488,7 @@ function renderLiveMatchup(){
 function renderQuickResults(){
   const wrap=$("quickResultGrid");
   if(!wrap)return;
-  wrap.innerHTML=QUICK_RESULTS.map(([id,label])=>`<button type="button" class="quick-result-button" data-quick-outcome="${id}"><strong>${outcomeCodeHtml(id)}</strong><span>${escapeHtml(label)}</span></button>`).join("");
+  wrap.innerHTML=QUICK_RESULTS.map(([id,label])=>`<button type="button" class="quick-result-button" data-quick-outcome="${id}">${outcomeCodeHtml(id)}<span>${escapeHtml(label)}</span></button>`).join("");
 }
 function renderPitchConsole(message=""){
   ensureScoringState();
@@ -1340,8 +1374,10 @@ function classicPdfHex(value){let h="";for(const ch of classicPdfSanitize(value)
 function classicPdfRgb(hex){const {r,g,b}=hexToRgb(hex);return `${(r/255).toFixed(4)} ${(g/255).toFixed(4)} ${(b/255).toFixed(4)}`;}
 function classicPdfColor(role){const color=role==="white"?classicPdfPalette.onSecondary:role==="brown"?classicPdfPalette.text:role==="cream"?classicPdfPalette.cream:classicPdfPalette[role]||classicPdfPalette.text;return classicPdfRgb(color);}
 function classicPdfText(cmd,value,x,top,width,size,opt={}){const text=classicPdfSanitize(value).trim();if(!text)return;const bold=opt.bold!==false;size=classicPdfFit(text,width,size,opt.minSize||4.2,bold);const w=classicPdfMeasure(text,size,bold);let dx=x;if(opt.align==="center")dx=x+Math.max(0,(width-w)/2);if(opt.align==="right")dx=x+Math.max(0,width-w);const y=CLASSIC_PDF_HEIGHT-top-size*.95;const matrix=opt.mirror?`-1 0 0 1 ${(dx+w).toFixed(2)} ${y.toFixed(2)}`:`1 0 0 1 ${dx.toFixed(2)} ${y.toFixed(2)}`;cmd.push(`BT /${bold?"F2":"F1"} ${size.toFixed(2)} Tf ${classicPdfColor(opt.color)} rg ${matrix} Tm ${classicPdfHex(text)} Tj ET`);}
-function classicPdfWrap(text,width,size,bold=false){const out=[];for(const para of classicPdfSanitize(text).split(/\r?\n/)){const words=para.trim().split(/\s+/).filter(Boolean);if(!words.length){out.push("");continue;}let line="";for(const word of words){const test=line?`${line} ${word}`:word;if(!line||classicPdfMeasure(test,size,bold)<=width)line=test;else{out.push(line);line=word;}}if(line)out.push(line);}return out;}
-function classicPdfNotes(cmd,text){const clean=classicPdfSanitize(text).replace(/^Game Notes\s*/i,"").trim();if(!clean)return;let size=7.2,lineHeight=8.4,lines=classicPdfWrap(clean,166,size,false);const maxHeight=143;while(lines.length*lineHeight>maxHeight&&size>5.2){size-=.25;lineHeight=size*1.18;lines=classicPdfWrap(clean,166,size,false);}lines.slice(0,Math.floor(maxHeight/lineHeight)).forEach((line,i)=>classicPdfText(cmd,line,423,617+i*lineHeight,166,size,{bold:false,minSize:size,color:"brown"}));}
+function classicPdfSplitWord(word,width,size,bold=false){const parts=[];let part="";for(const char of String(word||"")){const test=part+char;if(part&&classicPdfMeasure(test,size,bold)>width){parts.push(part);part=char;}else part=test;}if(part)parts.push(part);return parts;}
+function classicPdfWrap(text,width,size,bold=false){const out=[];for(const para of classicPdfSanitize(text).split(/\r?\n/)){const words=para.trim().split(/\s+/).filter(Boolean);if(!words.length){out.push("");continue;}let line="";for(const word of words){const pieces=classicPdfMeasure(word,size,bold)<=width?[word]:classicPdfSplitWord(word,width,size,bold);for(const piece of pieces){const test=line?`${line} ${piece}`:piece;if(!line||classicPdfMeasure(test,size,bold)<=width)line=test;else{out.push(line);line=piece;}}}if(line)out.push(line);}return out;}
+function classicPdfEllipsize(text,width,size,bold=false){const suffix="...";let value=String(text||"");while(value&&classicPdfMeasure(value+suffix,size,bold)>width)value=value.slice(0,-1);return `${value.trimEnd()}${suffix}`;}
+function classicPdfNotes(cmd,text){const clean=classicPdfSanitize(text).replace(/^Game Notes\s*/i,"").trim();if(!clean)return;const box={x:432,top:611,width:174,height:176};let size=7.2,lineHeight=8.4,lines=classicPdfWrap(clean,box.width,size,false);while(lines.length*lineHeight>box.height&&size>5.2){size-=.25;lineHeight=size*1.18;lines=classicPdfWrap(clean,box.width,size,false);}const maxLines=Math.max(1,Math.floor((box.height-size*.25)/lineHeight)),visible=lines.slice(0,maxLines);if(lines.length>maxLines)visible[maxLines-1]=classicPdfEllipsize(visible[maxLines-1],box.width,size,false);const clipY=CLASSIC_PDF_HEIGHT-box.top-box.height;cmd.push(`q ${box.x.toFixed(2)} ${clipY.toFixed(2)} ${box.width.toFixed(2)} ${box.height.toFixed(2)} re W n`);visible.forEach((line,i)=>classicPdfText(cmd,line,box.x,box.top+i*lineHeight,box.width,size,{bold:false,minSize:size,color:"brown"}));cmd.push("Q");}
 function colorDistance(a,b){return Math.sqrt((a[0]-b[0])**2+(a[1]-b[1])**2+(a[2]-b[2])**2);}
 function scorecardImageElement(){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(new Error("Classic scorecard background could not be loaded."));image.src=`data:image/jpeg;base64,${EMBEDDED_SCORECARD_BACKGROUND_JPEG_BASE64}`;});}
 function recolorScorecardCanvas(ctx,width,height,palette){const image=ctx.getImageData(0,0,width,height),pixels=image.data,targets=Object.fromEntries(Object.entries(palette).map(([key,value])=>[key,Object.values(hexToRgb(value))]));for(let i=0;i<pixels.length;i+=4){const rgb=[pixels[i],pixels[i+1],pixels[i+2]];let best=null,bestDistance=Infinity;for(const swatch of SCORECARD_SOURCE_SWATCHES){const distance=colorDistance(rgb,swatch.source);if(distance<bestDistance){bestDistance=distance;best=swatch;}}if(best&&bestDistance<62){const target=targets[best.role]||targets.text,shade=.38;pixels[i]=Math.max(0,Math.min(255,target[0]+(rgb[0]-best.source[0])*shade));pixels[i+1]=Math.max(0,Math.min(255,target[1]+(rgb[1]-best.source[1])*shade));pixels[i+2]=Math.max(0,Math.min(255,target[2]+(rgb[2]-best.source[2])*shade));}}ctx.putImageData(image,0,0);}
@@ -1449,6 +1485,6 @@ function init(){
       loadSchedule();
     }
   });
-  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=27.2-compact-pitcher-flow",{updateViaCache:"none"}).catch(console.warn);
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=27.2-quick-code-k-font",{updateViaCache:"none"}).catch(console.warn);
 }
 init();

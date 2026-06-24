@@ -1,6 +1,6 @@
-# Guariglia Baseball Scorecard Builder — Version 26.1
+# Guariglia Baseball Scorecard Builder — Version 27.2
 
-Version 26.1 is the consolidated **Game Management Update** built from the Version 26 testing build. It retains the approved Version 24 classic PDF foundation and all Version 25/26 scoring, pitch-tracking, ABS, and live-matchup capabilities.
+Version 27.2 is the current testing build, combining the Game Management Update with regulation-game rules, extra-inning continuation pages, active-roster pitcher selection, and corrected pitching exports. It retains the approved Version 24 classic PDF foundation and all Version 25/26 scoring, pitch-tracking, ABS, and live-matchup capabilities.
 
 ## Game Notes and Key Plays
 
@@ -67,6 +67,9 @@ Version 24 remains the approved production baseline until Version 27 is explicit
 - Uses one compact Add Pitcher dropdown, sorted by last name and then first name, for all unused eligible pitchers.
 - Shows full pitcher information: uniform number, name, throwing hand, record, ERA, and strikeouts.
 - Removes pitchers from availability after they enter while preserving their game history and statistics.
+- PDF and Excel pitching rows now list only pitchers who actually entered the game, in exact first-appearance order.
+- Unused roster pitchers no longer fill blank scorecard pitching lines.
+- Each exported pitcher retains uniform number, name, throwing hand, record, ERA, and strikeouts.
 
 ## Version 27.1
 

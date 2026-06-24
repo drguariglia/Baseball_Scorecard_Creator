@@ -24,7 +24,7 @@ assert.doesNotMatch(app, /Game information loaded[\s\S]{0,400}setPanel\("lineups
   "Selected-game import must not jump to the Lineups section");
 assert.match(html, /Refresh Schedule clears the current game before reloading/,
   "Section 1 should explain the refresh behavior");
-assert.match(html, /app\.js\?v=24-sharp-pdf/,
-  "Version 24 app JavaScript must be cache-busted");
+assert.match(html, /app\.js\?v=27.2-quick-code-k-font/,
+  "Version 27 app JavaScript must be cache-busted");
 
 console.log("refresh clearing and Section 1 retention tests passed");

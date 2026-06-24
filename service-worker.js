@@ -1,7 +1,7 @@
-const CACHE = "guariglia-scorecard-v27-2-compact-pitcher-flow";
+const CACHE = "guariglia-scorecard-v27-2-quick-code-k-font";
 const CORE_ASSETS = [
-  "/styles.css?v=27.2-compact-pitcher-flow",
-  "/app.js?v=27.2-compact-pitcher-flow",
+  "/styles.css?v=27.2-quick-code-k-font",
+  "/app.js?v=27.2-quick-code-k-font",
   "/baseball-data.js?v=27.2",
   "/template_data.js",
   "/pdf_background_data.js?v=27.2",
@@ -11,7 +11,7 @@ const CORE_ASSETS = [
   "/assets/icon-512.png",
   "/assets/Scorecard_20260615_blank_template.xlsx",
   "/assets/Scorecard_20260615_App_Colors_Classic_Blank.xlsx",
-  "/assets/classic-scorecard-background.jpg?v=27.2-compact-pitcher-flow",
+  "/assets/classic-scorecard-background.jpg?v=27.2-quick-code-k-font",
   "/manifest.webmanifest"
 ];
 

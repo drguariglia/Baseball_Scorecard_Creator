@@ -1,1 +1,1 @@
-Version 27.2 — Starter-First Add Pitcher Workflow
+Version 27.2 — Starter-First Pitching, Appearance-Order Exports, Bounded PDF Notes, and Matching-Font Backwards K Quick Code
