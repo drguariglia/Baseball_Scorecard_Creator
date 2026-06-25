@@ -7,16 +7,16 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Guariglia Scorecard" />
-  <title>Guariglia Baseball Scorecard Builder - Version 28</title>
+  <title>Guariglia Baseball Scorecard Builder - Version 29</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=28-consolidated-abs" />
+  <link rel="stylesheet" href="styles.css?v=29-unified-scoring" />
 </head>
 <body>
   <header class="hero no-print">
     <div class="hero-brand">
       <div class="brand-mark-wrap"><img class="brand-mark" src="assets/guariglia-crest.gif" alt="Guariglia crest" /></div>
       <div class="hero-copy">
-        <p class="eyebrow">Guariglia company app • Version 28</p>
+        <p class="eyebrow">Guariglia company app • Version 29</p>
         <h1>Baseball Scorecard Builder & Live Scorer</h1>
         <p class="subtitle">Build the scorecard, score every plate appearance from a phone or desktop, and export the finished game.</p>
       </div>
@@ -185,73 +185,77 @@
             <div><span>In the Hole</span><strong id="inHoleName">—</strong><small id="inHoleDetails"></small></div>
           </div>
 
-          <section class="abs-challenge-card broadcast-abs-challenge" aria-labelledby="absChallengeTitle">
-            <div class="abs-challenge-header broadcast-abs-header">
-              <div>
-                <p class="live-player-label">ABS Challenges</p>
-                <h3 id="absChallengeTitle">Ball–Strike Challenges</h3>
+          <section class="live-scoring-control-deck" aria-label="Live pitch and play controls">
+            <div class="active-pitcher-row compact-active-pitcher">
+              <label><span id="activePitcherTeamLabel">Defensive pitcher</span><select id="activePitcherSelect"></select></label>
+              <p>Every pitch and completed plate appearance is credited to this pitcher.</p>
+            </div>
+
+            <div class="pitch-button-grid compact-pitch-button-grid" aria-label="Pitch controls">
+              <button id="ballBtn" class="pitch-button ball-button" type="button" data-pitch="ball"><span>Ball</span><kbd>B</kbd></button>
+              <div class="strike-button-pair" role="group" aria-label="Strike controls">
+                <button id="swingStrikeBtn" class="pitch-button strike-button swing-strike-button" type="button" data-pitch="swingingStrike"><span>Swinging<br>Strike</span><kbd>S</kbd></button>
+                <button id="calledStrikeBtn" class="pitch-button strike-button called-strike-button" type="button" data-pitch="calledStrike"><span>Called<br>Strike</span><kbd>C</kbd></button>
               </div>
-              <p class="abs-rule-note">Only the batter, pitcher, or catcher may challenge. Successful challenges are retained; unsuccessful challenges are lost.</p>
+              <button id="foulBtn" class="pitch-button foul-button" type="button" data-pitch="foul"><span>Foul</span><kbd>F</kbd></button>
+              <button id="inPlayBtn" class="pitch-button inplay-button" type="button" data-pitch="inplay"><span>In Play</span><kbd>I</kbd></button>
             </div>
-            <div class="challenge-team-grid">
-              <article class="challenge-team-card" data-challenge-team="away">
-                <div class="challenge-team-heading"><h3 id="awayChallengeHeading">Away Challenges</h3><strong id="awayChallengesAvailable">2 available</strong></div>
-                <div id="awayChallengeTokens" class="challenge-token-row" aria-label="Away team challenge status"></div>
-                <button class="secondary compact challenge-record-button" data-record-challenge="away" type="button">Record Away Challenge</button>
-                <p id="awayChallengeStatus" class="challenge-status"></p>
-              </article>
-              <article class="challenge-team-card" data-challenge-team="home">
-                <div class="challenge-team-heading"><h3 id="homeChallengeHeading">Home Challenges</h3><strong id="homeChallengesAvailable">2 available</strong></div>
-                <div id="homeChallengeTokens" class="challenge-token-row" aria-label="Home team challenge status"></div>
-                <button class="secondary compact challenge-record-button" data-record-challenge="home" type="button">Record Home Challenge</button>
-                <p id="homeChallengeStatus" class="challenge-status"></p>
-              </article>
+
+            <div class="pitch-tool-row compact-pitch-tool-row">
+              <span id="pitchTotalLabel">0 pitches this plate appearance</span>
+              <div class="live-action-grid" aria-label="Pitch correction and scoring tools">
+                <button id="undoPitchBtn" class="secondary compact" type="button">Undo Pitch <kbd>⌫</kbd></button>
+                <button id="resetCountBtn" class="secondary compact" type="button">Reset Count</button>
+                <button id="recordErrorQuickBtn" class="secondary compact" type="button">Record Error</button>
+                <button id="challengeQuickBtn" class="primary compact challenge-toggle-button" type="button" aria-expanded="false" aria-controls="absChallengePanel">Challenge</button>
+              </div>
             </div>
-            <details class="broadcast-abs-log">
-              <summary><span>Challenge Log</span><strong id="challengeLogCount">0 attempts</strong></summary>
-              <div id="challengeEventLog" class="challenge-event-log"><p class="empty-tracking-note">No ABS challenges recorded.</p></div>
-            </details>
+
+            <div id="strikeoutChooser" class="terminal-choice" hidden>
+              <strong>Was strike three legally caught?</strong>
+              <p class="terminal-choice-note">The normal swinging or looking strikeout was recorded automatically. Use the first button only when the catcher did not legally catch strike three.</p>
+              <div class="terminal-choice-buttons two-choice">
+                <button type="button" data-terminal-outcome="D3K">K+ — Third Strike Not Caught</button>
+                <button type="button" data-terminal-outcome="dismiss">Caught — Keep Strikeout</button>
+              </div>
+            </div>
+
+            <div class="quick-results-card compact-quick-results">
+              <div class="quick-results-heading">
+                <div><strong>Quick result codes</strong><span>Tap a code when the plate appearance ends.</span></div>
+                <button id="toggleQuickResultsBtn" class="secondary compact" type="button" aria-expanded="true" aria-controls="quickResultGrid">Hide Codes</button>
+              </div>
+              <div id="quickResultGrid" class="quick-result-grid"></div>
+            </div>
+
+            <section id="absChallengePanel" class="abs-challenge-card broadcast-abs-challenge" aria-labelledby="absChallengeTitle" hidden>
+              <div class="abs-challenge-header broadcast-abs-header">
+                <div>
+                  <p class="live-player-label">ABS Challenges</p>
+                  <h3 id="absChallengeTitle">Ball–Strike Challenges</h3>
+                </div>
+                <p class="abs-rule-note">Only the batter, pitcher, or catcher may challenge. Successful challenges are retained; unsuccessful challenges are lost.</p>
+              </div>
+              <div class="challenge-team-grid">
+                <article class="challenge-team-card" data-challenge-team="away">
+                  <div class="challenge-team-heading"><h3 id="awayChallengeHeading">Away Challenges</h3><strong id="awayChallengesAvailable">2 available</strong></div>
+                  <div id="awayChallengeTokens" class="challenge-token-row" aria-label="Away team challenge status"></div>
+                  <button class="secondary compact challenge-record-button" data-record-challenge="away" type="button">Record Away Challenge</button>
+                  <p id="awayChallengeStatus" class="challenge-status"></p>
+                </article>
+                <article class="challenge-team-card" data-challenge-team="home">
+                  <div class="challenge-team-heading"><h3 id="homeChallengeHeading">Home Challenges</h3><strong id="homeChallengesAvailable">2 available</strong></div>
+                  <div id="homeChallengeTokens" class="challenge-token-row" aria-label="Home team challenge status"></div>
+                  <button class="secondary compact challenge-record-button" data-record-challenge="home" type="button">Record Home Challenge</button>
+                  <p id="homeChallengeStatus" class="challenge-status"></p>
+                </article>
+              </div>
+              <details class="broadcast-abs-log">
+                <summary><span>Challenge Log</span><strong id="challengeLogCount">0 attempts</strong></summary>
+                <div id="challengeEventLog" class="challenge-event-log"><p class="empty-tracking-note">No ABS challenges recorded.</p></div>
+              </details>
+            </section>
           </section>
-        </div>
-
-        <div class="active-pitcher-row">
-          <label><span id="activePitcherTeamLabel">Defensive pitcher</span><select id="activePitcherSelect"></select></label>
-          <p>Choose the pitcher currently on the mound. Every new pitch and completed plate appearance will be credited to this selection.</p>
-        </div>
-
-        <div class="pitch-button-grid" aria-label="Pitch controls">
-          <button id="ballBtn" class="pitch-button ball-button" type="button" data-pitch="ball"><span>Ball</span><kbd>B</kbd></button>
-          <div class="strike-button-pair" role="group" aria-label="Strike controls">
-            <button id="swingStrikeBtn" class="pitch-button strike-button swing-strike-button" type="button" data-pitch="swingingStrike"><span>Swinging<br>Strike</span><kbd>S</kbd></button>
-            <button id="calledStrikeBtn" class="pitch-button strike-button called-strike-button" type="button" data-pitch="calledStrike"><span>Called<br>Strike</span><kbd>C</kbd></button>
-          </div>
-          <button id="foulBtn" class="pitch-button foul-button" type="button" data-pitch="foul"><span>Foul</span><kbd>F</kbd></button>
-          <button id="inPlayBtn" class="pitch-button inplay-button" type="button" data-pitch="inplay"><span>In Play</span><kbd>I</kbd></button>
-        </div>
-
-        <div class="pitch-tool-row">
-          <span id="pitchTotalLabel">0 pitches this plate appearance</span>
-          <div class="button-row">
-            <button id="undoPitchBtn" class="secondary compact" type="button">Undo Pitch <kbd>⌫</kbd></button>
-            <button id="resetCountBtn" class="secondary compact" type="button">Reset Count</button><button id="recordErrorQuickBtn" class="secondary compact" type="button">Record Error</button>
-          </div>
-        </div>
-
-        <div id="strikeoutChooser" class="terminal-choice" hidden>
-          <strong>Was strike three legally caught?</strong>
-          <p class="terminal-choice-note">The normal swinging or looking strikeout was recorded automatically. Use the first button only when the catcher did not legally catch strike three.</p>
-          <div class="terminal-choice-buttons two-choice">
-            <button type="button" data-terminal-outcome="D3K">K+ — Third Strike Not Caught</button>
-            <button type="button" data-terminal-outcome="dismiss">Caught — Keep Strikeout</button>
-          </div>
-        </div>
-
-        <div class="quick-results-card">
-          <div class="quick-results-heading">
-            <div><strong>Quick result codes</strong><span>Tap a code when the plate appearance ends.</span></div>
-            <button id="toggleQuickResultsBtn" class="secondary compact" type="button" aria-expanded="true" aria-controls="quickResultGrid">Hide Codes</button>
-          </div>
-          <div id="quickResultGrid" class="quick-result-grid"></div>
         </div>
 
         <div class="scoring-help">
@@ -436,8 +440,8 @@
 
   <script src="vendor/jszip.min.js"></script>
   <script src="template_data.js"></script>
-  <script src="pdf_background_data.js?v=28"></script>
-  <script src="baseball-data.js?v=28"></script>
-  <script src="app.js?v=28-consolidated-abs"></script>
+  <script src="pdf_background_data.js?v=29"></script>
+  <script src="baseball-data.js?v=29"></script>
+  <script src="app.js?v=29-unified-scoring"></script>
 </body>
 </html>
