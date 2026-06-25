@@ -10,7 +10,7 @@ const buttonTags = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].
   attrs: match[1],
   body: match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }));
-assert.equal(buttonTags.length, 64, 'Version 27.2 must retain the complete 64-button static interface');
+assert.equal(buttonTags.length, 66, 'Version 27.2 must retain the complete 66-button static interface');
 
 for (const button of buttonTags) {
   const type = button.attrs.match(/\btype="([^"]+)"/)?.[1];
@@ -19,11 +19,11 @@ for (const button of buttonTags) {
 }
 
 const ids = [...html.matchAll(/<button\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]);
-assert.equal(ids.length, 46, 'Version 27.2 must retain all 46 named buttons');
+assert.equal(ids.length, 48, 'Version 27.2 must retain all 48 named buttons');
 assert.equal(new Set(ids).size, ids.length, 'button ids must remain unique');
 
 const expectedIds = [
-  'saveGameFileBtn','exportExcelBtn','printPdfBtn','refreshGamesBtn','lookupGameBtn','clearForManualBtn',
+  'saveGameFileBtn','exportExcelBtn','printPdfBtn','refreshGamesBtn','lookupGameBtn','clearForManualBtn','saveNowBtn','restoreAutosaveBtn',
   'ballBtn','swingStrikeBtn','calledStrikeBtn','foulBtn','inPlayBtn','undoPitchBtn','resetCountBtn',
   'recordErrorQuickBtn','toggleQuickResultsBtn','undoBtn','manualHalfBtn','resetScoringBtn','downloadPitchLogBtn',
   'exportExcelBtn2','printPdfBtn2','downloadBlankPdfBtn','downloadBlankBtn','saveGameFileBtn2','installBtn',
@@ -36,7 +36,7 @@ assert.deepEqual(ids.sort(), expectedIds.sort(), 'named button inventory changed
 
 const directClickIds = [
   'refreshGamesBtn','lookupGameBtn','clearForManualBtn','ballBtn','swingStrikeBtn','calledStrikeBtn','foulBtn',
-  'inPlayBtn','undoPitchBtn','resetCountBtn','recordErrorQuickBtn','toggleQuickResultsBtn','undoBtn','manualHalfBtn',
+  'inPlayBtn','undoPitchBtn','resetCountBtn','saveNowBtn','restoreAutosaveBtn','recordErrorQuickBtn','toggleQuickResultsBtn','undoBtn','manualHalfBtn',
   'resetScoringBtn','downloadPitchLogBtn','downloadBlankPdfBtn','downloadBlankBtn','installBtn','closePlayDialogBtn',
   'keyPlayBtn','recordErrorBtn','closeErrorPanelBtn','addSecondErrorBtn','deletePlayBtn','cancelPlayBtn',
   'closeSubstitutionDialogBtn','cancelSubstitutionBtn','closeChallengeDialogBtn','deleteChallengeBtn',

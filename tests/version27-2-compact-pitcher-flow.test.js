@@ -19,7 +19,7 @@ assert.match(app,/function renderPitcherEntryRows\(/);
 assert.match(app,/function openCustomPitcherDialog\(/);
 assert.match(app,/function saveCustomPitcher\(/);
 assert.match(css,/\.pitcher-data-pool\{display:none!important\}/);
-assert.match(sw,/v27-2-quick-code-k-font/);
+assert.match(sw,/v27-2-mobile-roster-save/);
 
 function sourceBetween(start,end){
   const a=app.indexOf(start);assert(a>=0,`${start} missing`);

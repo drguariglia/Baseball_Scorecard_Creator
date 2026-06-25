@@ -19,6 +19,6 @@ assert.match(app,/exportBlankClassicPdf\(true\)/,'traditional-guide option must 
 assert.match(app,/exportBlankClassicPdf\(false\)/,'clean-box option must be wired');
 assert.match(css,/\.pa-select\{appearance:none[\s\S]*font-size:1\.12rem[\s\S]*font-weight:900/,'online scoring codes must be large and bold');
 assert.doesNotMatch(app,/plays\.length\?plays\.map\(playNotation\)\.join\(" \/ "\):"\+"/,'computer print cells must not add plus signs');
-assert.match(html,/styles\.css\?v=27.2-quick-code-k-font/,'Version 27 CSS must be cache-busted');
-assert.match(html,/app\.js\?v=27.2-quick-code-k-font/,'Version 27 JS must be cache-busted');
+assert.match(html,/styles\.css\?v=27.2-mobile-roster-save/,'Version 27 CSS must be cache-busted');
+assert.match(html,/app\.js\?v=27.2-mobile-roster-save/,'Version 27 JS must be cache-busted');
 console.log('Version 24 inherited PDF theme and clean-box tests passed');

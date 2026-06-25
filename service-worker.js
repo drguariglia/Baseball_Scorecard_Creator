@@ -1,7 +1,7 @@
-const CACHE = "guariglia-scorecard-v27-2-continuous-autosave";
+const CACHE = "guariglia-scorecard-v27-2-mobile-roster-save";
 const CORE_ASSETS = [
-  "/styles.css?v=27.2-continuous-autosave",
-  "/app.js?v=27.2-continuous-autosave",
+  "/styles.css?v=27.2-mobile-roster-save",
+  "/app.js?v=27.2-mobile-roster-save",
   "/baseball-data.js?v=27.2",
   "/template_data.js",
   "/pdf_background_data.js?v=27.2",
@@ -11,7 +11,7 @@ const CORE_ASSETS = [
   "/assets/icon-512.png",
   "/assets/Scorecard_20260615_blank_template.xlsx",
   "/assets/Scorecard_20260615_App_Colors_Classic_Blank.xlsx",
-  "/assets/classic-scorecard-background.jpg?v=27.2-continuous-autosave",
+  "/assets/classic-scorecard-background.jpg?v=27.2-mobile-roster-save",
   "/manifest.webmanifest"
 ];
 

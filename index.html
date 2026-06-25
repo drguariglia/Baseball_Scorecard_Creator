@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="Guariglia Scorecard" />
   <title>Guariglia Baseball Scorecard Builder - Version 27.2</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=27.2-continuous-autosave" />
+  <link rel="stylesheet" href="styles.css?v=27.2-mobile-roster-save" />
 </head>
 <body>
   <header class="hero no-print">
@@ -278,7 +278,7 @@
     <section id="settings" class="panel">
       <div class="panel-title-row"><div><p class="section-kicker">App settings</p><h2>Template, recovery, transfer, and installation</h2></div></div>
       <div class="settings-grid">
-        <article class="entry-card"><h3>Continuous recovery</h3><p>Every field edit, pitch, play, substitution, challenge, note, and roster change is saved automatically in this browser. Closing, refreshing, exporting, or moving the app to the background will not erase the live game.</p><p id="autosaveDetails" class="small-note">Continuous autosave starting…</p><div class="stack-buttons"><button id="saveNowBtn" class="primary" type="button">Save Now</button><button id="restoreAutosaveBtn" class="secondary" type="button" disabled>Restore Previous Autosave</button></div><p class="small-note">Save Game File remains the method for moving a game to another device. Browser autosave protects this device.</p></article>
+        <article class="entry-card"><h3>Continuous recovery</h3><p>Every field edit, pitch, play, substitution, challenge, note, and roster change is saved automatically in this browser. Team, lineup, bench, and pitcher information is also protected by a separate mobile recovery copy. Closing, refreshing, exporting, or moving the app to the background will not erase the live game.</p><p id="autosaveDetails" class="small-note">Continuous autosave starting…</p><div class="stack-buttons"><button id="saveNowBtn" class="primary" type="button">Save Now</button><button id="restoreAutosaveBtn" class="secondary" type="button" disabled>Restore Previous Autosave</button></div><p class="small-note">Save Game File remains the method for moving a game to another device. Browser autosave protects this device.</p></article>
         <article class="entry-card"><h3>Blank scorecards</h3><p>The completed-game PDF uses the selected home MLB team’s colors and clean computer scoring boxes. Blank PDFs let you choose whether to retain the traditional plus signs and 2×3 ball-strike guides.</p><button id="downloadBlankPdfBtn" class="primary full-width" type="button">Download Blank PDF</button><label>Upload a newer Excel template<input id="templateFile" type="file" accept=".xlsx,.xlsm" /></label><p id="templateStatus" class="small-note">Using the built-in blank Excel scorecard.</p><button id="downloadBlankBtn" class="secondary full-width" type="button">Download Blank Excel</button></article>
         <article class="entry-card"><h3>Move a game between devices</h3><p>Save a game file on one device and open it on the other. All lineups, scoring, notes, and totals are included.</p><div class="stack-buttons"><button id="saveGameFileBtn2" class="secondary" type="button">Save Game File</button><label class="button secondary file-button">Open Game File<input id="openGameFile2" type="file" accept=".json,.scoregame" /></label></div></article>
         <article class="entry-card"><h3>Install on iPhone</h3><p>Open the Netlify site in Safari, tap Share, then choose <strong>Add to Home Screen</strong>.</p><button id="installBtn" class="secondary full-width" type="button" hidden>Install App</button></article>
@@ -405,6 +405,6 @@
   <script src="template_data.js"></script>
   <script src="pdf_background_data.js?v=27.2"></script>
   <script src="baseball-data.js?v=27.2"></script>
-  <script src="app.js?v=27.2-continuous-autosave"></script>
+  <script src="app.js?v=27.2-mobile-roster-save"></script>
 </body>
 </html>

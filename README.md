@@ -91,3 +91,6 @@ Version 24 remains the approved production baseline until Version 27 is explicit
 Version 27.2 now continuously saves the live game in the browser. Every field edit, pitch, completed play, substitution, pitcher change, ABS challenge, error, Key Play, and note is written to a current recovery snapshot, with the immediately previous snapshot retained as a backup. The app restores the current game automatically after refresh, browser restart, or reopening the installed app.
 
 The Settings section includes **Save Now** and **Restore Previous Autosave**. Save Game File remains the portable backup for moving a game to another device. Explicit reset and blank-card commands are the only actions that clear browser recovery data.
+
+### Version 27.2 iPhone roster persistence
+Team names, lineup and bench players, and pitchers now have a protected field cache and an independent browser-storage roster mirror. This prevents iPhone Safari or the installed web app from replacing restored roster fields with blanks while retaining scoring data. Intentional edits and resets still work normally.

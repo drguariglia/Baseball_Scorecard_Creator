@@ -18,8 +18,8 @@ assert.match(css, /@media \(max-width:360px\)[\s\S]*\.lineup-row,\.pitcher-row\{
 assert.match(css, /env\(safe-area-inset-bottom\)/, 'iPhone safe-area support must be present');
 assert.match(css, /max-height:94dvh/, 'dialog must use dynamic viewport height');
 assert.match(app, /class="mini-field name-field"/, 'generated lineup and pitching controls must include responsive labels');
-assert.match(html, /styles\.css\?v=27.2-quick-code-k-font/, 'responsive stylesheet must be cache-busted');
-assert.match(app, /service-worker\.js\?v=27.2-quick-code-k-font/, 'service worker registration must be cache-busted');
+assert.match(html, /styles\.css\?v=27.2-mobile-roster-save/, 'responsive stylesheet must be cache-busted');
+assert.match(app, /service-worker\.js\?v=27.2-mobile-roster-save/, 'service worker registration must be cache-busted');
 
 
 assert.match(html, /class="entry-card lookup-card"/, 'scheduled game card must be a responsive container');
