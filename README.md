@@ -85,3 +85,9 @@ Version 24 remains the approved production baseline until Version 27 is explicit
 - Provides a postseason/traditional extra-inning option with empty bases.
 - Preserves innings 1–10 on PDF page 1 and automatically adds a continuation scorecard for innings 11–20 on page 2.
 - Save Game File, Download Excel, and Download PDF retain all on-screen data and then offer a deliberate, double-confirmed Clear Card option.
+
+## Continuous autosave and recovery
+
+Version 27.2 now continuously saves the live game in the browser. Every field edit, pitch, completed play, substitution, pitcher change, ABS challenge, error, Key Play, and note is written to a current recovery snapshot, with the immediately previous snapshot retained as a backup. The app restores the current game automatically after refresh, browser restart, or reopening the installed app.
+
+The Settings section includes **Save Now** and **Restore Previous Autosave**. Save Game File remains the portable backup for moving a game to another device. Explicit reset and blank-card commands are the only actions that clear browser recovery data.

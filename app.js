@@ -9,6 +9,9 @@ const ERROR_TYPES = [
 ];
 const POSITION_NUMBERS = {P:"1",C:"2","1B":"3","2B":"4","3B":"5",SS:"6",LF:"7",CF:"8",RF:"9"};
 const LEGACY_STORAGE_PREFIXES = ["guariglia-scorecard", "scorecard20260615"];
+const AUTOSAVE_STORAGE_KEY = "guariglia-scorecard-v27.2-autosave-current";
+const AUTOSAVE_BACKUP_KEY = "guariglia-scorecard-v27.2-autosave-previous";
+const AUTOSAVE_SCHEMA_VERSION = 1;
 const TEMPLATE_FILE_NAME = "Scorecard_20260615_blank_template.xlsx";
 const VERSION_NUMBER = 27.2;
 const DEFAULT_SCORECARD_COLORS = {primary:"#3D2519",secondary:"#9B4D1F",accent:"#D9A441"};
@@ -116,6 +119,8 @@ let uploadedTemplateName = "";
 let scheduleGames = [];
 let scheduleRequestToken = 0;
 let autosaveTimer = null;
+let lastAutosaveStateJson = "";
+let autosaveRestoring = false;
 let deferredInstallPrompt = null;
 let dialogErrorRoster = [];
 let pendingExportKind = "";
@@ -340,10 +345,11 @@ function pitcherDisplayText(team,row){return formatPitcher(collectData()[team]?.
 function setPanel(id){
   document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id===id));
   document.querySelectorAll(".step").forEach(b=>b.classList.toggle("active",b.dataset.panel===id));
-  if(id==="summary") renderSummary();
-  if(id==="pitchTracking") renderPitchTracking();
-  if(id==="scoring") renderScoring();
+  if(id==="summary")renderSummary();
+  if(id==="pitchTracking")renderPitchTracking();
+  if(id==="scoring")renderScoring();
   window.scrollTo({top:0,behavior:"smooth"});
+  if(!autosaveRestoring)scheduleAutosave("Section position updated");
 }
 function teamName(team){ const d=collectData(); return d[`${team}Team`] || (team==="away"?"Away":"Home"); }
 function battingTeamForHalf(half){ return half==="top"?"away":"home"; }
@@ -628,7 +634,7 @@ function toggleQuickResults(){
   const grid=$("quickResultGrid");
   if(!grid)return;
   const isVisible=!grid.hidden&&!grid.classList.contains("is-collapsed");
-  setQuickResultsVisible(!isVisible);
+  setQuickResultsVisible(!isVisible);scheduleAutosave("Quick Codes display updated");
 }
 function scoringPanelActive(){ return $("scoring")?.classList.contains("active"); }
 function handleScoringKeyboard(event){
@@ -1056,13 +1062,14 @@ function manualChangeHalf(){
   const n=nextHalfState(scoring.inning,scoring.half),prepared=prepareHalfInningState({...n,outs:0,bases:emptyBases(),battingIndexes:deepClone(scoring.battingIndexes)},scoring.automaticRunnerPlacements);scoring.inning=prepared.inning;scoring.half=prepared.half;scoring.outs=0;scoring.bases=prepared.bases;scoring.count=initialCount();scoring.lastAutoStrikeoutPlayId="";refreshAll();scheduleAutosave("Half-inning changed by manual correction");
 }
 function clearPersistentGameData(){
-  clearTimeout(autosaveTimer);
+  clearTimeout(autosaveTimer);lastAutosaveStateJson="";
   try{
     for(let i=localStorage.length-1;i>=0;i--){
       const key=localStorage.key(i)||"";
-      if(LEGACY_STORAGE_PREFIXES.some(prefix=>key.startsWith(prefix))) localStorage.removeItem(key);
+      if(key===AUTOSAVE_STORAGE_KEY||key===AUTOSAVE_BACKUP_KEY||LEGACY_STORAGE_PREFIXES.some(prefix=>key.startsWith(prefix)))localStorage.removeItem(key);
     }
-  }catch(err){ console.warn("Stored game data could not be cleared.",err); }
+  }catch(err){console.warn("Stored game data could not be cleared.",err);}
+  updateAutosaveControls();
 }
 function blankEntireGame(message="Blank game ready. Choose a scheduled game or enter one manually.",returnToSetup=true){
   clearPersistentGameData();
@@ -1130,6 +1137,7 @@ function renderPitchTracking(){
 }
 function csvCell(value){const text=String(value??"");return /[",\n]/.test(text)?`"${text.replace(/"/g,'""')}"`:text;}
 function downloadPitchLogCsv(){
+  persistAutosaveNow("Pitch log export checkpoint",{force:true});
   ensureScoringState();
   const headers=["Pitch #","Inning","Half","Pitching Team","Pitcher #","Pitcher","Batting Team","Batter","Pitch Code","Pitch Type","Count Before","Count After","Recorded At"];
   const rows=[headers,...[...scoring.pitchLog].sort((a,b)=>a.seq-b.seq).map(e=>[e.seq,e.inning,e.half,e.pitchingTeam,e.pitcherNumber,e.pitcherName,e.battingTeam,e.batterName,e.code,e.label,`${num(e.countBefore?.balls)}-${num(e.countBefore?.strikes)}`,`${num(e.countAfter?.balls)}-${num(e.countAfter?.strikes)}`,e.recordedAt])];
@@ -1164,22 +1172,106 @@ function renderSummary(){
 function refreshHeadings(){ const a=teamName("away"),h=teamName("home");$("awayLineupHeading").textContent=`${a} Lineup`;$("homeLineupHeading").textContent=`${h} Lineup`;$("awayPitcherHeading").textContent=`${a} Pitchers`;$("homePitcherHeading").textContent=`${h} Pitchers`;$("awayScoringHeading").textContent=`${a} Batters`;$("homeScoringHeading").textContent=`${h} Batters`; }
 function refreshAll(){ refreshHeadings();renderScoring();renderSummary();renderPitchTracking();renderChallengeTracker();renderPitchingChangeControls(); }
 
-function serializeApp(){ return {app:"Guariglia Baseball Scorecard Builder",version:VERSION_NUMBER,savedAt:new Date().toISOString(),data:collectData(),scoring}; }
+function collectUiState(){
+  return {
+    activePanel:document.querySelector(".panel.active")?.id||"setup",
+    lookupDate:getField("lookupDate"),
+    scheduleLevel:getField("scheduleLevel")||"mlb",
+    quickResultsVisible:$("toggleQuickResultsBtn")?.getAttribute("aria-expanded")!=="false"
+  };
+}
+function applyUiState(ui={}){
+  if(ui.lookupDate)setField("lookupDate",ui.lookupDate);
+  if(ui.scheduleLevel)setField("scheduleLevel",ui.scheduleLevel);
+  if(typeof ui.quickResultsVisible==="boolean")setQuickResultsVisible(ui.quickResultsVisible);
+  if(ui.activePanel&&$(ui.activePanel))setPanel(ui.activePanel);
+}
+function serializeApp(){ return {app:"Guariglia Baseball Scorecard Builder",version:VERSION_NUMBER,autosaveSchema:AUTOSAVE_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:collectData(),scoring:deepClone(scoring),ui:collectUiState()}; }
+function autosaveStateJson(snapshot){return JSON.stringify({data:snapshot.data,scoring:snapshot.scoring,ui:snapshot.ui||{}});}
+function parseSavedSnapshot(raw){
+  if(!raw)return null;
+  const saved=JSON.parse(raw);
+  if(!saved?.data||!saved?.scoring)throw new Error("Saved game data is incomplete.");
+  return saved;
+}
+function updateAutosaveControls(){
+  const restore=$("restoreAutosaveBtn");
+  if(restore){
+    try{restore.disabled=!localStorage.getItem(AUTOSAVE_BACKUP_KEY);}catch{restore.disabled=true;}
+  }
+}
+function updateAutosaveStatus(message,savedAt=""){
+  if($("autosaveBar"))$("autosaveBar").textContent=message;
+  if($("autosaveDetails"))$("autosaveDetails").textContent=savedAt?`${message} Recovery time: ${new Date(savedAt).toLocaleString()}.`:message;
+  updateAutosaveControls();
+}
+function persistAutosaveNow(message="Autosaved",options={}){
+  clearTimeout(autosaveTimer);
+  if(autosaveRestoring)return false;
+  try{
+    const snapshot=serializeApp(),stateJson=autosaveStateJson(snapshot),savedAt=new Date().toISOString();
+    snapshot.savedAt=savedAt;snapshot.autosaveReason=message;
+    const raw=JSON.stringify(snapshot);
+    const currentRaw=localStorage.getItem(AUTOSAVE_STORAGE_KEY);
+    const changed=stateJson!==lastAutosaveStateJson;
+    if(changed&&currentRaw&&options.rotate!==false)localStorage.setItem(AUTOSAVE_BACKUP_KEY,currentRaw);
+    if(changed||options.force||!currentRaw)localStorage.setItem(AUTOSAVE_STORAGE_KEY,raw);
+    lastAutosaveStateJson=stateJson;
+    updateAutosaveStatus(`Autosave active • Saved ${new Date(savedAt).toLocaleTimeString([], {hour:"numeric",minute:"2-digit",second:"2-digit"})}`,savedAt);
+    return true;
+  }catch(err){
+    console.error("Autosave failed",err);
+    updateAutosaveStatus("Autosave could not write to this browser. Download a Game File now.");
+    return false;
+  }
+}
 function scheduleAutosave(message="Current session updated"){
   clearTimeout(autosaveTimer);
-  if($("autosaveBar")) $("autosaveBar").textContent=`${message}…`;
-  autosaveTimer=setTimeout(()=>{
-    if($("autosaveBar")) $("autosaveBar").textContent=`Current session updated ${new Date().toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}. Use Save Game File to keep it.`;
-  },350);
+  if(autosaveRestoring)return;
+  updateAutosaveStatus(`${message} • Saving…`);
+  autosaveTimer=setTimeout(()=>persistAutosaveNow(message),250);
+}
+function applySavedSnapshot(saved,sourceLabel="Autosave restored"){
+  autosaveRestoring=true;
+  try{
+    scoring=deepClone(saved.scoring);ensureScoringState();setFieldsFromData(saved.data);applyUiState(saved.ui||{});refreshAll();
+    lastAutosaveStateJson=autosaveStateJson({data:saved.data,scoring:saved.scoring,ui:saved.ui||{}});
+    updateAutosaveStatus(`${sourceLabel} • Continuous autosave active`,saved.savedAt||"");
+  }finally{autosaveRestoring=false;}
+}
+function initializePersistentStartup(){
+  const candidates=[[AUTOSAVE_STORAGE_KEY,"Recovered current game"],[AUTOSAVE_BACKUP_KEY,"Recovered previous backup"]];
+  for(const [key,label] of candidates){
+    try{
+      const raw=localStorage.getItem(key);if(!raw)continue;
+      const saved=parseSavedSnapshot(raw);
+      if(key===AUTOSAVE_BACKUP_KEY)localStorage.setItem(AUTOSAVE_STORAGE_KEY,raw);
+      applySavedSnapshot(saved,label);return true;
+    }catch(err){console.warn(`${label} failed`,err);try{localStorage.removeItem(key);}catch{}}
+  }
+  scoring=initialScoring();setFieldsFromData({});
+  const today=globalThis.BaseballData?.localDateISO?.("America/New_York")||new Date().toISOString().slice(0,10);
+  setField("lookupDate",today);setField("scheduleLevel","mlb");refreshAll();setPanel("setup");
+  updateAutosaveStatus("Autosave active • Blank game ready");
+  return false;
+}
+function saveNow(){persistAutosaveNow("Saved manually",{force:true});}
+function restorePreviousAutosave(){
+  let previousRaw,currentRaw,saved;
+  try{previousRaw=localStorage.getItem(AUTOSAVE_BACKUP_KEY);currentRaw=localStorage.getItem(AUTOSAVE_STORAGE_KEY);saved=parseSavedSnapshot(previousRaw);}catch(err){alert(`Previous autosave is unavailable: ${err.message}`);return;}
+  if(!previousRaw||!saved){alert("No previous autosave is available yet.");return;}
+  if(!confirm("Restore the previous autosave? The current version will be kept as the new recovery backup."))return;
+  try{localStorage.setItem(AUTOSAVE_STORAGE_KEY,previousRaw);if(currentRaw)localStorage.setItem(AUTOSAVE_BACKUP_KEY,currentRaw);applySavedSnapshot(saved,"Previous autosave restored");}catch(err){alert(`Could not restore the previous autosave: ${err.message}`);}
 }
 function downloadBlob(blob,name){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);}
 function safeFileName(value){return String(value||"baseball-game").replace(/[^a-z0-9._-]+/gi,"_").replace(/^_+|_+$/g,"");}
 function hasCurrentGameData(){const d=collectData();return Boolean(scoring.plays.length||scoring.pitchLog.length||scoring.substitutions.length||scoring.pitcherChanges.length||d.awayTeam||d.homeTeam||d.gameNotes||d.away.lineup.some(player=>player.name||player.num)||d.home.lineup.some(player=>player.name||player.num));}
 function showPostExportDialog(kind){pendingExportKind=kind;const dialog=$("postExportDialog");if(!dialog)return;$("postExportTitle").textContent=`${kind} saved — keep this game open?`;$("postExportMessage").textContent=`The ${kind.toLowerCase()} was downloaded successfully. Nothing has been deleted. Choose Clear Card only when you are completely finished with this game.`;dialog.showModal();}
 function clearAfterExport(){if(!confirm("Permanently clear this live game from the screen? Your downloaded file will remain, but all current on-screen scoring data will be erased."))return;$("postExportDialog").close();blankEntireGame(`${pendingExportKind||"File"} saved. Live card cleared by request.`);pendingExportKind="";}
-function saveGameFile(){const d=collectData(),name=safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"game"}`);downloadBlob(new Blob([JSON.stringify(serializeApp(),null,2)],{type:"application/json"}),`${name}.scoregame.json`);$("autosaveBar").textContent="Game file downloaded. All live data remains on screen.";setTimeout(()=>showPostExportDialog("Game File"),120);}
+function saveGameFile(){persistAutosaveNow("Game file checkpoint",{force:true});const d=collectData(),name=safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"game"}`);downloadBlob(new Blob([JSON.stringify(serializeApp(),null,2)],{type:"application/json"}),`${name}.scoregame.json`);$("autosaveBar").textContent="Game file downloaded. All live data remains on screen.";setTimeout(()=>showPostExportDialog("Game File"),120);}
 async function openGameFile(file){
-  try{const saved=JSON.parse(await file.text());if(!saved.data||!saved.scoring)throw new Error("This is not a compatible Version 11 through Version 27 game file.");setFieldsFromData(saved.data);scoring=saved.scoring;ensureScoringState();refreshAll();scheduleAutosave("Game file opened");setPanel("scoring");}catch(err){alert(`Could not open the game file: ${err.message}`);}
+  persistAutosaveNow("Checkpoint before opening a game file",{force:true});
+  try{const saved=JSON.parse(await file.text());if(!saved.data||!saved.scoring)throw new Error("This is not a compatible Version 11 through Version 27 game file.");scoring=deepClone(saved.scoring);ensureScoringState();setFieldsFromData(saved.data);applyUiState(saved.ui||{});refreshAll();persistAutosaveNow("Game file opened",{force:true});setPanel("scoring");}catch(err){alert(`Could not open the game file: ${err.message}`);}
 }
 function clearForManual(){
   if(!confirm("Start a blank game? This clears every current scorecard field and recorded play."))return;
@@ -1271,7 +1363,7 @@ async function loadSelectedGame(){
     setFieldsFromData(payload.data||{});
     scoring=initialScoring();
     refreshAll();
-    scheduleAutosave("Official game information loaded");
+    persistAutosaveNow("Official game information loaded",{force:true});
     setConnectionState("connected","Selected game connected");
     const source=payload.source?` Connection: ${payload.source}.`:"";
     $("lookupStatus").textContent=`Game information loaded. Review the populated game information below before moving to the next section.${source}`;
@@ -1314,6 +1406,7 @@ function gameManagementTimeline(){
 function automaticRunnerNoteLines(){return (scoring.automaticRunnerPlacements||[]).map(item=>`${item.half==="top"?"Top":"Bottom"} ${item.inning} — Automatic runner: ${item.runner?.name||"preceding batter"} placed on second for ${teamName(item.team)}`);}
 function exportNotes(d,t){const score=`${gameIsFinal()?"Final Score":"Current Score"}: ${d.awayTeam||"Away"} ${t.away.runs}, ${d.homeTeam||"Home"} ${t.home.runs}`,status=gameIsFinal()?gameStatusText():"",timeline=gameManagementTimeline(),automaticRunners=automaticRunnerNoteLines(),challenges=challengeLogText();return ["Game Notes",score,status,d.gameNotes,...automaticRunners,...timeline,challenges?`ABS Challenges: ${challenges}`:""].filter(Boolean).join("\n");}
 async function exportExcel(){
+  persistAutosaveNow("Excel export checkpoint",{force:true});
   try{
     const d=collectData(),t=computeGameTotals(),zip=await JSZip.loadAsync(getTemplateArrayBuffer()),path="xl/worksheets/sheet1.xml",xml=await zip.file(path).async("text"),doc=new DOMParser().parseFromString(xml,"application/xml");
     setXmlCell(doc,"A1","");setXmlCell(doc,"A2",topLine(d));setXmlCell(doc,"A3",[[d.weather?`Weather: ${d.weather}`:"",d.umpires?`Umpires: ${d.umpires}`:""].filter(Boolean).join(" • "),[d.broadcast?`TV: ${d.broadcast}`:"",d.radio?`Radio: ${d.radio}`:""].filter(Boolean).join(" • ")].filter(Boolean).join("\n"));
@@ -1420,12 +1513,12 @@ function buildClassicPdfBytes(imageInfo,contentInput=""){
   contentTexts.forEach((text,index)=>{const content=new TextEncoder().encode(text);offsets[contentStart+index]=length;txt(`${contentStart+index} 0 obj\n<< /Length ${content.length} >>\nstream\n`);push(content);txt("endstream\nendobj\n");});
   const xref=length;txt(`xref\n0 ${objectCount+1}\n0000000000 65535 f \n`);for(let i=1;i<=objectCount;i++)txt(`${String(offsets[i]).padStart(10,"0")} 00000 n \n`);txt(`trailer\n<< /Size ${objectCount+1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);const out=new Uint8Array(length);let pos=0;for(const part of parts){out.set(part,pos);pos+=part.length;}return out;
 }
-async function exportClassicPdf(){try{const d=collectData();classicPdfPalette=scorecardPaletteForHomeTeam(d.homeTeam);const image=await themedScorecardBackground(false,classicPdfPalette),maxInning=Math.max(scoring.inning,...scoring.plays.map(play=>num(play.inning))),pages=[classicPdfOverlay(1)];if(maxInning>=11)pages.push(classicPdfOverlay(11));const bytes=buildClassicPdfBytes(image,pages);downloadBlob(new Blob([bytes],{type:"application/pdf"}),`${safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"scorecard"}`)}.pdf`);$("autosaveBar").textContent=`PDF downloaded with ${pages.length} scorecard page${pages.length===1?"":"s"}. All live data remains on screen.`;setTimeout(()=>showPostExportDialog("PDF Scorecard"),120);}catch(err){console.error(err);alert(`PDF export failed: ${err.message}`);}}
+async function exportClassicPdf(){persistAutosaveNow("PDF export checkpoint",{force:true});try{const d=collectData();classicPdfPalette=scorecardPaletteForHomeTeam(d.homeTeam);const image=await themedScorecardBackground(false,classicPdfPalette),maxInning=Math.max(scoring.inning,...scoring.plays.map(play=>num(play.inning))),pages=[classicPdfOverlay(1)];if(maxInning>=11)pages.push(classicPdfOverlay(11));const bytes=buildClassicPdfBytes(image,pages);downloadBlob(new Blob([bytes],{type:"application/pdf"}),`${safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"scorecard"}`)}.pdf`);$("autosaveBar").textContent=`PDF downloaded with ${pages.length} scorecard page${pages.length===1?"":"s"}. All live data remains on screen.`;setTimeout(()=>showPostExportDialog("PDF Scorecard"),120);}catch(err){console.error(err);alert(`PDF export failed: ${err.message}`);}}
 async function exportBlankClassicPdf(includeTraditionalGuides){try{const d=collectData();classicPdfPalette=scorecardPaletteForHomeTeam(d.homeTeam);const image=await themedScorecardBackground(includeTraditionalGuides,classicPdfPalette),bytes=buildClassicPdfBytes(image);downloadBlob(new Blob([bytes],{type:"application/pdf"}),`${safeFileName(`${d.homeTeam||"Baseball"}_blank_scorecard${includeTraditionalGuides?"_with_guides":"_clean"}`)}.pdf`);$("blankPdfDialog").close();$("autosaveBar").textContent=`Blank PDF downloaded using ${paletteStatusText(d.homeTeam)}${includeTraditionalGuides?" with traditional guides":" with clean scoring boxes"}.`;}catch(err){console.error(err);alert(`Blank PDF export failed: ${err.message}`);}}
 
 function initEvents(){
   document.querySelectorAll(".step").forEach(b=>b.addEventListener("click",()=>setPanel(b.dataset.panel)));document.querySelectorAll(".next-panel").forEach(b=>b.addEventListener("click",()=>setPanel(b.dataset.next)));
-  document.addEventListener("input",e=>{if(e.target.matches("input,textarea,select")&&!e.target.closest("#playDialog")){refreshHeadings();scheduleAutosave();}});
+  const autosaveFieldChange=e=>{if(e.target.matches("input,textarea,select")&&!e.target.closest("#playDialog")){refreshHeadings();scheduleAutosave();}};document.addEventListener("input",autosaveFieldChange);document.addEventListener("change",autosaveFieldChange);
   $("playForm").addEventListener("submit",recordPlay);$("closePlayDialogBtn").addEventListener("click",()=>$("playDialog").close());$("cancelPlayBtn").addEventListener("click",()=>$("playDialog").close());$("playOutcome").addEventListener("change",handlePlayOutcomeChange);
   $("keyPlayBtn").addEventListener("click",toggleKeyPlay);$("recordErrorBtn").addEventListener("click",()=>showErrorAssignmentPanel(getFieldingErrorsFromDialog(),getField("errorDetails")));$("recordErrorQuickBtn").addEventListener("click",recordCurrentError);$("closeErrorPanelBtn").addEventListener("click",closeErrorAssignmentPanel);$("addSecondErrorBtn").addEventListener("click",addErrorAssignmentRow);
   $("errorAssignmentRows").addEventListener("click",event=>{const button=event.target.closest("[data-remove-error]");if(button)removeErrorAssignmentRow(num(button.dataset.removeError));});$("errorAssignmentRows").addEventListener("change",()=>{$("playErrors").value=getFieldingErrorsFromDialog().length;});
@@ -1448,7 +1541,7 @@ function initEvents(){
   $("refreshGamesBtn").addEventListener("click",refreshScheduleAndClear);$("dailyGameSelect").addEventListener("change",()=>$("lookupGameBtn").disabled=!$("dailyGameSelect").value);$("lookupGameBtn").addEventListener("click",loadSelectedGame);$("clearForManualBtn").addEventListener("click",clearForManual);
   $("downloadPitchLogBtn").addEventListener("click",downloadPitchLogCsv);
   ["exportExcelBtn","exportExcelBtn2"].forEach(id=>$(id).addEventListener("click",exportExcel));["printPdfBtn","printPdfBtn2"].forEach(id=>$(id).addEventListener("click",exportClassicPdf));["saveGameFileBtn","saveGameFileBtn2"].forEach(id=>$(id).addEventListener("click",saveGameFile));
-  $("clearAfterExportBtn").addEventListener("click",clearAfterExport);$("keepGameOpenBtn").addEventListener("click",()=>{pendingExportKind="";});$("closePostExportDialogBtn").addEventListener("click",()=>{pendingExportKind="";});$("postExportDialog").addEventListener("close",()=>{pendingExportKind="";});
+  $("clearAfterExportBtn").addEventListener("click",clearAfterExport);$("saveNowBtn").addEventListener("click",saveNow);$("restoreAutosaveBtn").addEventListener("click",restorePreviousAutosave);$("keepGameOpenBtn").addEventListener("click",()=>{pendingExportKind="";});$("closePostExportDialogBtn").addEventListener("click",()=>{pendingExportKind="";});$("postExportDialog").addEventListener("close",()=>{pendingExportKind="";});
   ["openGameFile","openGameFile2"].forEach(id=>$(id).addEventListener("change",e=>{if(e.target.files[0])openGameFile(e.target.files[0]);e.target.value="";}));$("templateFile").addEventListener("change",e=>{if(e.target.files[0])uploadTemplate(e.target.files[0]);});$("downloadBlankBtn").addEventListener("click",downloadBlank);$("downloadBlankPdfBtn").addEventListener("click",()=>$("blankPdfDialog").showModal());$("blankPdfWithGuidesBtn").addEventListener("click",()=>exportBlankClassicPdf(true));$("blankPdfCleanBtn").addEventListener("click",()=>exportBlankClassicPdf(false));
   $("lookupDate").addEventListener("change",loadSchedule);$("scheduleLevel").addEventListener("change",loadSchedule);$("extraInningsRule").addEventListener("change",()=>{rebuildDerivedGameState();refreshAll();scheduleAutosave("Extra-inning rule updated");});
   window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;$("installBtn").hidden=false;});$("installBtn").addEventListener("click",async()=>{if(!deferredInstallPrompt)return;deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;$("installBtn").hidden=true;});
@@ -1460,31 +1553,14 @@ function disableBrowserFormRestore(){
   });
   document.querySelectorAll("form").forEach(form=>form.setAttribute("autocomplete","off"));
 }
-function initializeBlankStartup(){
-  clearPersistentGameData();
-  scoring=initialScoring();
-  setFieldsFromData({});
-  const today=globalThis.BaseballData?.localDateISO?.("America/New_York") || new Date().toISOString().slice(0,10);
-  setField("lookupDate",today);
-  setField("scheduleLevel","mlb");
-  refreshAll();
-  setPanel("setup");
-  if($("autosaveBar")) $("autosaveBar").textContent="Blank game ready. Use Save Game File to preserve a game.";
-}
 function init(){
   createLineupInputs("away");createLineupInputs("home");createBenchInputs("away");createBenchInputs("home");createPitcherInputs("away");createPitcherInputs("home");
-  disableBrowserFormRestore();
-  renderQuickResults();
-  setQuickResultsVisible(true);
-  initEvents();
-  initializeBlankStartup();
-  loadSchedule();
-  window.addEventListener("pageshow",event=>{
-    if(event.persisted){
-      initializeBlankStartup();
-      loadSchedule();
-    }
-  });
-  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=27.2-quick-code-k-font",{updateViaCache:"none"}).catch(console.warn);
+  disableBrowserFormRestore();renderQuickResults();setQuickResultsVisible(true);initEvents();
+  initializePersistentStartup();loadSchedule();
+  window.addEventListener("pageshow",event=>{if(event.persisted){refreshAll();updateAutosaveStatus("Game retained from browser memory • Autosave active");}});
+  window.addEventListener("pagehide",()=>persistAutosaveNow("Saved before leaving",{force:true}));
+  window.addEventListener("beforeunload",()=>persistAutosaveNow("Saved before closing",{force:true}));
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")persistAutosaveNow("Saved while app moved to background",{force:true});});
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=27.2-continuous-autosave",{updateViaCache:"none"}).catch(console.warn);
 }
 init();
