@@ -38,3 +38,13 @@
 - iPhone standalone visual render: PASS
 - Version 27.2 autosave migration compatibility: PASS
 - ZIP and duplicate-ID validation: PASS
+
+## Version 29 Unified Live Scoring Center — June 25, 2026
+
+- Full inherited automated suite: passed.
+- New Version 29 structural, palette, control-order, ABS-toggle, and autosave-migration tests: passed.
+- JavaScript syntax checks: passed.
+- Desktop render at 1440 px: passed with no horizontal overflow.
+- iPhone render at 390 px: passed with no horizontal overflow.
+- Verified control order: Undo Pitch / Reset Count, then Record Error / Challenge.
+- Verified Quick Result codes appear before the on-demand ABS challenge panel.

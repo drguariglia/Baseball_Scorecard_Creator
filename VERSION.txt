@@ -1,1 +1,1 @@
-Version 28 — Broadcast-Style Live Game Center with Consolidated ABS and Continuous Autosave
+Version 29 — Unified Palette-Matched Live Scoring Center with Integrated Pitch, Quick Result, Error, and Challenge Controls
