@@ -1,6 +1,6 @@
 const fs=require("fs"),assert=require("assert");
 const app=fs.readFileSync("app.js","utf8"),html=fs.readFileSync("index.html","utf8"),pkg=require("../package.json");
-assert(app.includes("const VERSION_NUMBER = 27"),"Version 27 constant missing");
+assert(app.includes("const VERSION_NUMBER = 28"),"Version 27 constant missing");
 assert(html.includes('id="extraInningsRule"'),"Extra-inning rule selector missing");
 assert(app.includes("function decideGameStatus"),"Game-ending decision logic missing");
 assert(app.includes('half==="bottom"&&score.home>score.away'),"Walk-off ending rule missing");
@@ -10,5 +10,5 @@ assert(app.includes("runnerIndex=(dueIndex+LINEUP_ROWS-1)%LINEUP_ROWS"),"Precedi
 assert(app.includes("if(maxInning>=11)pages.push(classicPdfOverlay(11))"),"Innings 11-20 PDF continuation missing");
 assert(app.includes("function showPostExportDialog"),"Safe post-export prompt missing");
 assert(html.includes('id="keepGameOpenBtn"')&&html.includes('id="clearAfterExportBtn"'),"Keep/clear choices missing");
-assert(pkg.version==="27.2.0","Package version must be 27.2.0");
+assert(pkg.version==="28.0.0","Package version must be 28.0.0");
 console.log("Version 27 regulation, extras, continuation PDF, and safe export checks passed.");

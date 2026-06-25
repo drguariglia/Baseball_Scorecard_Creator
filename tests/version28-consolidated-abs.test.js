@@ -1,0 +1,20 @@
+const fs=require('fs');
+const assert=require('assert');
+const html=fs.readFileSync('index.html','utf8');
+const css=fs.readFileSync('styles.css','utf8');
+const app=fs.readFileSync('app.js','utf8');
+
+const scoreboxStart=html.indexOf('<div class="scoreboard-card broadcast-scorebox"');
+const scoreboxEnd=html.indexOf('\n        </div>\n\n        <div class="active-pitcher-row">',scoreboxStart);
+const absStart=html.indexOf('<section class="abs-challenge-card broadcast-abs-challenge"',scoreboxStart);
+assert(scoreboxStart>=0&&scoreboxEnd>scoreboxStart,'broadcast scorebox boundaries must exist');
+assert(absStart>scoreboxStart&&absStart<scoreboxEnd,'ABS challenge tracker must be inside the Live Game Center scorebox');
+assert.equal((html.match(/class="abs-challenge-card/g)||[]).length,1,'there must be only one ABS tracker');
+for(const id of ['absChallengeTitle','awayChallengeTokens','homeChallengeTokens','awayChallengesAvailable','homeChallengesAvailable','challengeLogCount','challengeEventLog'])assert(html.includes(`id="${id}"`),`missing consolidated ABS element ${id}`);
+assert.match(html,/class="broadcast-abs-log"/,'challenge history must be compact and collapsible');
+assert.match(css,/broadcast-abs-challenge\.abs-challenge-card/,'consolidated ABS styles missing');
+assert.match(css,/broadcast-abs-challenge \.challenge-team-card/,'compact team challenge styles missing');
+assert.match(css,/broadcast-abs-log summary/,'compact challenge log styles missing');
+assert.match(css,/@media \(max-width:430px\)[\s\S]*broadcast-abs-challenge/,'mobile ABS consolidation rules missing');
+assert.match(app,/document\.querySelector\("\.abs-challenge-card"\)\.addEventListener\("click"/,'consolidated ABS controls must retain delegated behavior');
+console.log('Version 28 consolidated ABS Live Game Center tests passed');

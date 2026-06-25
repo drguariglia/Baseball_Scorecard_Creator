@@ -75,4 +75,4 @@ const legacyPrinted=Array.from(legacy.scorecardPitchersForTeam('away'));
 assert.deepEqual(legacyPrinted.map(p=>p.name),['Legacy Pitcher']);
 assert.equal(legacyPrinted[0].era,'3.50');
 
-console.log('Version 27.2 PDF/Excel actual pitcher appearance-order tests passed.');
+console.log('Version 28 PDF/Excel actual pitcher appearance-order tests passed.');

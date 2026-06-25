@@ -16,7 +16,7 @@ assert.match(app, /visibilitychange[\s\S]*persistAutosaveNow/, "backgrounding th
 assert.match(app, /beforeunload[\s\S]*persistAutosaveNow/, "closing the browser must flush autosave");
 assert.match(app, /Reset the entire game\?/, "reset confirmation must describe a complete reset");
 assert.match(html, /Reset Entire Game/, "reset button must describe the complete reset");
-assert.match(html, /app\.js\?v=27\.2-mobile-roster-save/, "app JavaScript must be cache-busted");
-assert.match(worker, /guariglia-scorecard-v27-2-mobile-roster-save/, "service-worker cache must be bumped");
+assert.match(html, /app\.js\?v=28-consolidated-abs/, "app JavaScript must be cache-busted");
+assert.match(worker, /guariglia-scorecard-v28-consolidated-abs/, "service-worker cache must be bumped");
 
 console.log("continuous startup recovery and reset tests passed");

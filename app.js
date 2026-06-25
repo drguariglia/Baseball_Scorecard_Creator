@@ -9,12 +9,13 @@ const ERROR_TYPES = [
 ];
 const POSITION_NUMBERS = {P:"1",C:"2","1B":"3","2B":"4","3B":"5",SS:"6",LF:"7",CF:"8",RF:"9"};
 const LEGACY_STORAGE_PREFIXES = ["guariglia-scorecard", "scorecard20260615"];
-const AUTOSAVE_STORAGE_KEY = "guariglia-scorecard-v27.2-autosave-current";
-const AUTOSAVE_BACKUP_KEY = "guariglia-scorecard-v27.2-autosave-previous";
-const AUTOSAVE_ROSTER_KEY = "guariglia-scorecard-v27.2-roster-mirror";
+const AUTOSAVE_STORAGE_KEY = "guariglia-scorecard-v28-autosave-current";
+const AUTOSAVE_BACKUP_KEY = "guariglia-scorecard-v28-autosave-previous";
+const AUTOSAVE_ROSTER_KEY = "guariglia-scorecard-v28-roster-mirror";
+const LEGACY_AUTOSAVE_KEYS = {current:"guariglia-scorecard-v27.2-autosave-current",backup:"guariglia-scorecard-v27.2-autosave-previous",roster:"guariglia-scorecard-v27.2-roster-mirror"};
 const AUTOSAVE_SCHEMA_VERSION = 2;
 const TEMPLATE_FILE_NAME = "Scorecard_20260615_blank_template.xlsx";
-const VERSION_NUMBER = 27.2;
+const VERSION_NUMBER = 28;
 const DEFAULT_SCORECARD_COLORS = {primary:"#3D2519",secondary:"#9B4D1F",accent:"#D9A441"};
 const MLB_TEAM_COLOR_RECORDS = [
   {aliases:["arizona diamondbacks","diamondbacks","ari"],primary:"#A71930",secondary:"#000000",accent:"#E3D4AD"},
@@ -268,7 +269,11 @@ function mergeMissingGameData(current={},fallback={}){
   return merged;
 }
 function readRosterMirror(){
-  try{const raw=localStorage.getItem(AUTOSAVE_ROSTER_KEY);if(!raw)return null;const parsed=JSON.parse(raw);return parsed?.data?parsed:null;}catch(err){console.warn("Roster mirror could not be read",err);return null;}
+  try{
+    let raw=localStorage.getItem(AUTOSAVE_ROSTER_KEY);
+    if(!raw&&LEGACY_AUTOSAVE_KEYS?.roster){raw=localStorage.getItem(LEGACY_AUTOSAVE_KEYS.roster);if(raw)localStorage.setItem(AUTOSAVE_ROSTER_KEY,raw);}
+    if(!raw)return null;const parsed=JSON.parse(raw);return parsed?.data?parsed:null;
+  }catch(err){console.warn("Roster mirror could not be read",err);return null;}
 }
 function persistRosterMirror(data){
   try{localStorage.setItem(AUTOSAVE_ROSTER_KEY,JSON.stringify({savedAt:new Date().toISOString(),data:deepClone(data)}));return true;}catch(err){console.warn("Roster mirror could not be saved",err);return false;}
@@ -404,6 +409,15 @@ function setPanel(id){
   if(!autosaveRestoring)scheduleAutosave("Section position updated");
 }
 function teamName(team){ const d=collectData(); return d[`${team}Team`] || (team==="away"?"Away":"Home"); }
+function teamScoreboxAbbreviation(team){
+  const name=teamName(team),key=normalizeTeamColorName(name),matched=MLB_TEAM_COLOR_RECORDS.find(item=>item.aliases.some(alias=>normalizeTeamColorName(alias)===key));
+  if(matched){const code=matched.aliases.find(alias=>/^[a-z]{3}$/i.test(alias))||matched.aliases.find(alias=>/^[a-z]{2}$/i.test(alias));if(code)return code.toUpperCase();}
+  const words=String(name||"").replace(/[^A-Za-z0-9 ]+/g," ").trim().split(/\s+/).filter(Boolean);
+  if(!words.length)return team==="away"?"AWY":"HME";
+  if(words.length===1)return words[0].slice(0,3).toUpperCase();
+  return words.map(word=>word[0]).join("").slice(0,3).toUpperCase();
+}
+function compactInningLabel(){if(gameIsFinal())return "FINAL";return `${scoring.half==="top"?"▲":"▼"} ${scoring.inning}`;}
 function battingTeamForHalf(half){ return half==="top"?"away":"home"; }
 function currentBattingTeam(){ return battingTeamForHalf(scoring.half); }
 function automaticRunnerEnabled(){return (getField("extraInningsRule")||"automatic-runner")==="automatic-runner";}
@@ -536,6 +550,11 @@ function renderLiveMatchup(){
   $("currentBatterDetails").textContent=batterDetails.join(" • ")||"Batter details not yet available.";
   const prior=liveBatterPlateAppearances(team,index);
   $("currentBatterHistory").textContent=prior.length?prior.map(play=>play.outcome==="KL"?"K looking":playNotation(play)).join(" • "):`First plate appearance • ${scoring.half==="top"?"Top":"Bottom"} ${scoring.inning}`;
+  const onDeckIndex=(index+1)%LINEUP_ROWS,inHoleIndex=(index+2)%LINEUP_ROWS,onDeck=activeBatter(team,onDeckIndex),inHole=activeBatter(team,inHoleIndex);
+  if($("onDeckName"))$("onDeckName").textContent=onDeck.name||`Batter ${onDeckIndex+1}`;
+  if($("onDeckDetails"))$("onDeckDetails").textContent=[onDeck.num?`#${String(onDeck.num).replace(/^#/,"")}`:"",onDeck.pos||"",`Lineup ${onDeckIndex+1}`].filter(Boolean).join(" • ");
+  if($("inHoleName"))$("inHoleName").textContent=inHole.name||`Batter ${inHoleIndex+1}`;
+  if($("inHoleDetails"))$("inHoleDetails").textContent=[inHole.num?`#${String(inHole.num).replace(/^#/,"")}`:"",inHole.pos||"",`Lineup ${inHoleIndex+1}`].filter(Boolean).join(" • ");
 
   const info=activePitcherInfo(team),season=info.row>=0?(data[info.team]?.pitchers?.[info.row]||{}):{},tracking=computePitcherTracking()[info.team]?.find(row=>row.key===info.key||row.row===info.row);
   $("currentPitcherName").textContent=info.name||`${teamName(info.team)} pitcher`;
@@ -904,8 +923,9 @@ function renderScoring(){
 function renderScoreboard(){
   const totals=computeGameTotals();
   $("scoreAwayName").textContent=teamName("away"); $("scoreHomeName").textContent=teamName("home");
+  if($("scoreAwayAbbr"))$("scoreAwayAbbr").textContent=teamScoreboxAbbreviation("away");if($("scoreHomeAbbr"))$("scoreHomeAbbr").textContent=teamScoreboxAbbreviation("home");
   $("scoreAwayRuns").textContent=totals.away.runs; $("scoreHomeRuns").textContent=totals.home.runs;
-  $("inningLabel").textContent=gameIsFinal()?"FINAL":`${scoring.half==="top"?"Top":"Bottom"} ${scoring.inning}`; $("outsLabel").textContent=gameIsFinal()?scoring.gameStatus.reason:`${scoring.outs} ${scoring.outs===1?"out":"outs"}`;
+  $("inningLabel").textContent=compactInningLabel(); $("outsLabel").textContent=gameIsFinal()?scoring.gameStatus.reason:`${scoring.outs} ${scoring.outs===1?"out":"outs"}`;
   const statusLabel=$("gameStatusLabel");if(statusLabel){statusLabel.textContent=gameStatusText();statusLabel.classList.toggle("is-final",gameIsFinal());statusLabel.classList.toggle("is-extra",!gameIsFinal()&&scoring.inning>=10);}
   document.body.classList.toggle("game-final",gameIsFinal());
   [1,2,3].forEach(base=>$(base===1?"base1":base===2?"base2":"base3").classList.toggle("occupied",Boolean(scoring.bases[base])));
@@ -1293,14 +1313,19 @@ function applySavedSnapshot(saved,sourceLabel="Autosave restored"){
   }finally{autosaveRestoring=false;}
 }
 function initializePersistentStartup(){
-  const candidates=[[AUTOSAVE_STORAGE_KEY,"Recovered current game"],[AUTOSAVE_BACKUP_KEY,"Recovered previous backup"]];
-  for(const [key,label] of candidates){
+  const candidates=[
+    [AUTOSAVE_STORAGE_KEY,"Recovered current game",false],
+    [AUTOSAVE_BACKUP_KEY,"Recovered previous backup",false],
+    [LEGACY_AUTOSAVE_KEYS.current,"Recovered Version 27.2 game",true],
+    [LEGACY_AUTOSAVE_KEYS.backup,"Recovered Version 27.2 backup",true]
+  ];
+  for(const [key,label,isLegacy] of candidates){
     try{
       const raw=localStorage.getItem(key);if(!raw)continue;
       const saved=parseSavedSnapshot(raw);
-      if(key===AUTOSAVE_BACKUP_KEY)localStorage.setItem(AUTOSAVE_STORAGE_KEY,raw);
-      applySavedSnapshot(saved,label);return true;
-    }catch(err){console.warn(`${label} failed`,err);try{localStorage.removeItem(key);}catch{}}
+      if(key===AUTOSAVE_BACKUP_KEY||isLegacy)localStorage.setItem(AUTOSAVE_STORAGE_KEY,raw);
+      applySavedSnapshot(saved,label);if(isLegacy)persistAutosaveNow("Migrated game to Version 28",{force:true,rotate:false});return true;
+    }catch(err){console.warn(`${label} failed`,err);try{if(!isLegacy)localStorage.removeItem(key);}catch{}}
   }
   const mirror=readRosterMirror();
   scoring=initialScoring();setFieldsFromData(mirror?.data||{});
@@ -1330,7 +1355,7 @@ function clearAfterExport(){if(!confirm("Permanently clear this live game from t
 function saveGameFile(){persistAutosaveNow("Game file checkpoint",{force:true});const d=collectData(),name=safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"game"}`);downloadBlob(new Blob([JSON.stringify(serializeApp(),null,2)],{type:"application/json"}),`${name}.scoregame.json`);$("autosaveBar").textContent="Game file downloaded. All live data remains on screen.";setTimeout(()=>showPostExportDialog("Game File"),120);}
 async function openGameFile(file){
   persistAutosaveNow("Checkpoint before opening a game file",{force:true});
-  try{const saved=JSON.parse(await file.text());if(!saved.data||!saved.scoring)throw new Error("This is not a compatible Version 11 through Version 27 game file.");scoring=deepClone(saved.scoring);ensureScoringState();setFieldsFromData(saved.data);applyUiState(saved.ui||{});refreshAll();persistAutosaveNow("Game file opened",{force:true});setPanel("scoring");}catch(err){alert(`Could not open the game file: ${err.message}`);}
+  try{const saved=JSON.parse(await file.text());if(!saved.data||!saved.scoring)throw new Error("This is not a compatible Version 11 through Version 28 game file.");scoring=deepClone(saved.scoring);ensureScoringState();setFieldsFromData(saved.data);applyUiState(saved.ui||{});refreshAll();persistAutosaveNow("Game file opened",{force:true});setPanel("scoring");}catch(err){alert(`Could not open the game file: ${err.message}`);}
 }
 function clearForManual(){
   if(!confirm("Start a blank game? This clears every current scorecard field and recorded play."))return;
@@ -1508,7 +1533,7 @@ async function uploadTemplate(file){try{uploadedTemplateBuffer=await file.arrayB
 
 
 
-// Version 27 preserves the classic scorecard geometry and adds automatic continuation pages for innings 11–20.
+// Version 28 retains the classic scorecard geometry and automatic continuation pages for innings 11–20 while redesigning the live game center.
 // Clean computer-scored PDFs rebuild each scoring grid so no plus-sign or 2x3 counter fragments remain.
 const CLASSIC_PDF_WIDTH=612, CLASSIC_PDF_HEIGHT=792;
 const SCORECARD_SOURCE_SWATCHES=[
@@ -1623,6 +1648,6 @@ function init(){
   window.addEventListener("beforeunload",()=>persistAutosaveNow("Saved before closing",{force:true}));
   document.addEventListener("freeze",()=>persistAutosaveNow("Saved before mobile suspension",{force:true}));
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")persistAutosaveNow("Saved while app moved to background",{force:true});else stabilizeRestoredGameFields("Game fields restored from background");});
-  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=27.2-mobile-roster-save",{updateViaCache:"none"}).catch(console.warn);
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=28-consolidated-abs",{updateViaCache:"none"}).catch(console.warn);
 }
 init();

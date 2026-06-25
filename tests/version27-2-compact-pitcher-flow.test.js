@@ -7,7 +7,7 @@ const html=fs.readFileSync('index.html','utf8');
 const css=fs.readFileSync('styles.css','utf8');
 const sw=fs.readFileSync('service-worker.js','utf8');
 
-assert.match(app,/const VERSION_NUMBER = 27\.2;/);
+assert.match(app,/const VERSION_NUMBER = 28;/);
 assert.match(html,/The starting pitcher appears first\. Use the Add Pitcher dropdown/);
 assert.match(html,/id="awayBullpenInputs"[^>]*hidden/);
 assert.match(html,/id="homeBullpenInputs"[^>]*hidden/);
@@ -19,7 +19,7 @@ assert.match(app,/function renderPitcherEntryRows\(/);
 assert.match(app,/function openCustomPitcherDialog\(/);
 assert.match(app,/function saveCustomPitcher\(/);
 assert.match(css,/\.pitcher-data-pool\{display:none!important\}/);
-assert.match(sw,/v27-2-mobile-roster-save/);
+assert.match(sw,/v28-consolidated-abs/);
 
 function sourceBetween(start,end){
   const a=app.indexOf(start);assert(a>=0,`${start} missing`);
@@ -71,4 +71,4 @@ assert.match(select.innerHTML,/Add custom pitcher…/);
 assert.equal(select.disabled,false);
 assert.match(status.textContent,/Active: #1 — Starter/);
 
-console.log('Version 27.2 compact starter-first pitcher workflow tests passed.');
+console.log('Version 28 compact starter-first pitcher workflow tests passed.');

@@ -7,16 +7,16 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Guariglia Scorecard" />
-  <title>Guariglia Baseball Scorecard Builder - Version 27.2</title>
+  <title>Guariglia Baseball Scorecard Builder - Version 28</title>
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=27.2-mobile-roster-save" />
+  <link rel="stylesheet" href="styles.css?v=28-consolidated-abs" />
 </head>
 <body>
   <header class="hero no-print">
     <div class="hero-brand">
       <div class="brand-mark-wrap"><img class="brand-mark" src="assets/guariglia-crest.gif" alt="Guariglia crest" /></div>
       <div class="hero-copy">
-        <p class="eyebrow">Guariglia company app • Version 27.2</p>
+        <p class="eyebrow">Guariglia company app • Version 28</p>
         <h1>Baseball Scorecard Builder & Live Scorer</h1>
         <p class="subtitle">Build the scorecard, score every plate appearance from a phone or desktop, and export the finished game.</p>
       </div>
@@ -121,66 +121,97 @@
     </section>
 
     <section id="scoring" class="panel scoring-panel">
-      <div class="scoreboard-card">
-        <div class="scoreboard-team"><span id="scoreAwayName">Away</span><strong id="scoreAwayRuns">0</strong></div>
-        <div class="inning-state"><strong id="inningLabel">Top 1</strong><span id="outsLabel">0 outs</span><span id="gameStatusLabel" class="game-status-label">Game in progress</span><div class="bases" aria-label="Base runners"><span id="base2" class="base"></span><span id="base3" class="base"></span><span id="base1" class="base"></span></div></div>
-        <div class="scoreboard-team home"><span id="scoreHomeName">Home</span><strong id="scoreHomeRuns">0</strong></div>
-      </div>
-
-      <section class="abs-challenge-card" aria-labelledby="absChallengeTitle">
-        <div class="abs-challenge-header">
-          <div>
-            <p class="section-kicker">2026 MLB ABS Challenge System</p>
-            <h2 id="absChallengeTitle">Ball–Strike Challenges</h2>
-            <p>Track every challenge, who requested it, and whether the team retained or lost the challenge.</p>
-          </div>
-          <p class="abs-rule-note">Only the batter, pitcher, or catcher may challenge. A successful challenge is retained; an unsuccessful challenge is lost.</p>
-        </div>
-        <div class="challenge-team-grid">
-          <article class="challenge-team-card" data-challenge-team="away">
-            <div class="challenge-team-heading"><h3 id="awayChallengeHeading">Away Challenges</h3><strong id="awayChallengesAvailable">2 available</strong></div>
-            <div id="awayChallengeTokens" class="challenge-token-row" aria-label="Away team challenge status"></div>
-            <button class="secondary compact challenge-record-button" data-record-challenge="away" type="button">Record Away Challenge</button>
-            <p id="awayChallengeStatus" class="challenge-status"></p>
-          </article>
-          <article class="challenge-team-card" data-challenge-team="home">
-            <div class="challenge-team-heading"><h3 id="homeChallengeHeading">Home Challenges</h3><strong id="homeChallengesAvailable">2 available</strong></div>
-            <div id="homeChallengeTokens" class="challenge-token-row" aria-label="Home team challenge status"></div>
-            <button class="secondary compact challenge-record-button" data-record-challenge="home" type="button">Record Home Challenge</button>
-            <p id="homeChallengeStatus" class="challenge-status"></p>
-          </article>
-        </div>
-        <div class="challenge-log-heading"><h3>Challenge Log</h3><span id="challengeLogCount">0 attempts</span></div>
-        <div id="challengeEventLog" class="challenge-event-log"><p class="empty-tracking-note">No ABS challenges recorded.</p></div>
-      </section>
-
       <section class="pitch-console" aria-labelledby="pitchConsoleTitle">
-        <div class="pitch-console-header">
-          <div class="pitch-console-intro">
+        <div class="pitch-console-title-row">
+          <div>
             <p class="section-kicker">Pitch-by-pitch scoring</p>
-            <h2 id="pitchConsoleTitle">Live Count</h2>
-            <p id="pitchStatus" class="pitch-status" role="status">Ready for the first pitch.</p>
+            <h2 id="pitchConsoleTitle">Live Game Center</h2>
           </div>
-          <div class="count-and-matchup" aria-live="polite">
-            <div class="count-display" aria-label="Current balls and strikes">
-              <div><strong id="ballCount">0</strong><span>–</span><strong id="strikeCount">0</strong></div>
-              <small>BALLS – STRIKES</small>
+          <p id="pitchStatus" class="pitch-status" role="status">Ready for the first pitch.</p>
+        </div>
+
+        <div class="scoreboard-card broadcast-scorebox" aria-label="Current game situation" aria-live="polite">
+          <div class="broadcast-score-main">
+            <div class="broadcast-team-stack" aria-label="Score">
+              <div class="broadcast-team-row away-row">
+                <span id="scoreAwayAbbr" class="broadcast-team-abbr">AWY</span>
+                <span id="scoreAwayName" class="broadcast-team-name">Away</span>
+                <strong id="scoreAwayRuns" class="broadcast-team-score">0</strong>
+              </div>
+              <div class="broadcast-team-row home-row">
+                <span id="scoreHomeAbbr" class="broadcast-team-abbr">HME</span>
+                <span id="scoreHomeName" class="broadcast-team-name">Home</span>
+                <strong id="scoreHomeRuns" class="broadcast-team-score">0</strong>
+              </div>
             </div>
-            <div class="live-matchup-card" aria-label="Current batter and pitcher">
-              <article class="live-player batter-live-player">
-                <p class="live-player-label">Current Batter</p>
-                <h3 id="currentBatterName">Enter lineups to begin</h3>
-                <p id="currentBatterDetails" class="live-player-details">Lineup information will appear here.</p>
-                <p><strong>Today:</strong> <span id="currentBatterHistory">No previous plate appearances</span></p>
-              </article>
-              <article class="live-player pitcher-live-player">
-                <p class="live-player-label">Current Pitcher</p>
-                <h3 id="currentPitcherName">Enter pitchers to begin</h3>
-                <p id="currentPitcherDetails" class="live-player-details">Pitcher information will appear here.</p>
-                <p><strong>Game:</strong> <span id="currentPitcherGameStats">0 pitches</span></p>
-              </article>
+
+            <div class="broadcast-situation">
+              <div class="broadcast-inning-row">
+                <strong id="inningLabel" class="broadcast-inning">▲ 1</strong>
+                <span id="outsLabel" class="broadcast-outs">0 outs</span>
+                <span id="gameStatusLabel" class="game-status-label">Game in progress</span>
+              </div>
+              <div class="broadcast-diamond-and-count">
+                <div class="bases broadcast-bases" aria-label="Base runners">
+                  <span id="base2" class="base"></span>
+                  <span id="base3" class="base"></span>
+                  <span id="base1" class="base"></span>
+                </div>
+                <div class="count-display broadcast-count" aria-label="Current balls and strikes">
+                  <small>BALLS – STRIKES</small>
+                  <div><strong id="ballCount">0</strong><span>–</span><strong id="strikeCount">0</strong></div>
+                </div>
+              </div>
             </div>
           </div>
+
+          <div class="live-matchup-card broadcast-matchup-card" aria-label="Current batter and pitcher">
+            <article class="live-player batter-live-player">
+              <p class="live-player-label">At Bat</p>
+              <h3 id="currentBatterName">Enter lineups to begin</h3>
+              <p id="currentBatterDetails" class="live-player-details">Lineup information will appear here.</p>
+              <p><strong>Today:</strong> <span id="currentBatterHistory">No previous plate appearances</span></p>
+            </article>
+            <article class="live-player pitcher-live-player">
+              <p class="live-player-label">Pitching</p>
+              <h3 id="currentPitcherName">Enter pitchers to begin</h3>
+              <p id="currentPitcherDetails" class="live-player-details">Pitcher information will appear here.</p>
+              <p><strong>Game:</strong> <span id="currentPitcherGameStats">0 pitches</span></p>
+            </article>
+          </div>
+
+          <div class="broadcast-batting-order" aria-label="Upcoming batters">
+            <div><span>On Deck</span><strong id="onDeckName">—</strong><small id="onDeckDetails"></small></div>
+            <div><span>In the Hole</span><strong id="inHoleName">—</strong><small id="inHoleDetails"></small></div>
+          </div>
+
+          <section class="abs-challenge-card broadcast-abs-challenge" aria-labelledby="absChallengeTitle">
+            <div class="abs-challenge-header broadcast-abs-header">
+              <div>
+                <p class="live-player-label">ABS Challenges</p>
+                <h3 id="absChallengeTitle">Ball–Strike Challenges</h3>
+              </div>
+              <p class="abs-rule-note">Only the batter, pitcher, or catcher may challenge. Successful challenges are retained; unsuccessful challenges are lost.</p>
+            </div>
+            <div class="challenge-team-grid">
+              <article class="challenge-team-card" data-challenge-team="away">
+                <div class="challenge-team-heading"><h3 id="awayChallengeHeading">Away Challenges</h3><strong id="awayChallengesAvailable">2 available</strong></div>
+                <div id="awayChallengeTokens" class="challenge-token-row" aria-label="Away team challenge status"></div>
+                <button class="secondary compact challenge-record-button" data-record-challenge="away" type="button">Record Away Challenge</button>
+                <p id="awayChallengeStatus" class="challenge-status"></p>
+              </article>
+              <article class="challenge-team-card" data-challenge-team="home">
+                <div class="challenge-team-heading"><h3 id="homeChallengeHeading">Home Challenges</h3><strong id="homeChallengesAvailable">2 available</strong></div>
+                <div id="homeChallengeTokens" class="challenge-token-row" aria-label="Home team challenge status"></div>
+                <button class="secondary compact challenge-record-button" data-record-challenge="home" type="button">Record Home Challenge</button>
+                <p id="homeChallengeStatus" class="challenge-status"></p>
+              </article>
+            </div>
+            <details class="broadcast-abs-log">
+              <summary><span>Challenge Log</span><strong id="challengeLogCount">0 attempts</strong></summary>
+              <div id="challengeEventLog" class="challenge-event-log"><p class="empty-tracking-note">No ABS challenges recorded.</p></div>
+            </details>
+          </section>
         </div>
 
         <div class="active-pitcher-row">
@@ -235,6 +266,8 @@
           <button id="resetScoringBtn" class="danger" type="button" title="Erase the entire game after confirmation.">Reset Entire Game</button>
         </div>
       </section>
+
+
 
       <div class="team-score-section">
         <div class="team-score-heading"><h3 id="awayScoringHeading">Away Batters</h3><span>Recorded plate appearances 1–10</span></div>
@@ -403,8 +436,8 @@
 
   <script src="vendor/jszip.min.js"></script>
   <script src="template_data.js"></script>
-  <script src="pdf_background_data.js?v=27.2"></script>
-  <script src="baseball-data.js?v=27.2"></script>
-  <script src="app.js?v=27.2-mobile-roster-save"></script>
+  <script src="pdf_background_data.js?v=28"></script>
+  <script src="baseball-data.js?v=28"></script>
+  <script src="app.js?v=28-consolidated-abs"></script>
 </body>
 </html>

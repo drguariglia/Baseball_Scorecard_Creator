@@ -8,7 +8,7 @@ const app=fs.readFileSync(path.join(root,"app.js"),"utf8");
 const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
 const worker=fs.readFileSync(path.join(root,"service-worker.js"),"utf8");
 
-assert.match(app,/const AUTOSAVE_ROSTER_KEY = "guariglia-scorecard-v27\.2-roster-mirror"/);
+assert.match(app,/const AUTOSAVE_ROSTER_KEY = "guariglia-scorecard-v28-roster-mirror"/);
 assert.match(app,/const gameFieldCache = new Map\(\)/);
 assert.match(app,/function rehydrateGameFieldsFromCache\(\)/);
 assert.match(app,/function mergeMissingGameData\(current=\{\},fallback=\{\}\)/);
@@ -16,8 +16,8 @@ assert.match(app,/document\.addEventListener\("freeze",\(\)=>persistAutosaveNow\
 assert.match(app,/window\.addEventListener\("pageshow",event=>\{stabilizeRestoredGameFields/);
 assert.match(app,/window\.addEventListener\("focus",\(\)=>stabilizeRestoredGameFields/);
 assert.match(app,/key===AUTOSAVE_ROSTER_KEY/);
-assert.match(html,/app\.js\?v=27\.2-mobile-roster-save/);
-assert.match(worker,/guariglia-scorecard-v27-2-mobile-roster-save/);
+assert.match(html,/app\.js\?v=28-consolidated-abs/);
+assert.match(worker,/guariglia-scorecard-v28-consolidated-abs/);
 
 const start=app.indexOf('const GAME_DATA_TOP_LEVEL_FIELDS');
 const end=app.indexOf('function formatPlayer',start);
@@ -29,7 +29,7 @@ const context={console,JSON,Date,Math};
 vm.createContext(context);
 vm.runInContext(`
 const LINEUP_ROWS=9,PITCHER_ROWS=15,BENCH_ROWS=10;
-const AUTOSAVE_ROSTER_KEY="guariglia-scorecard-v27.2-roster-mirror";
+const AUTOSAVE_ROSTER_KEY="guariglia-scorecard-v28-roster-mirror";
 const gameFieldCache=new Map();
 const deepClone=value=>JSON.parse(JSON.stringify(value));
 const localStorage={getItem:key=>__storage.has(key)?__storage.get(key):null,setItem:(key,value)=>__storage.set(key,String(value)),removeItem:key=>__storage.delete(key)};
@@ -76,4 +76,4 @@ assert.equal(recovered.awayTeam,"Mets");
 assert.equal(recovered.homeTeam,"Phillies");
 assert.equal(recovered.away.pitchers[0].name,"Kodai Senga");
 
-console.log("Version 27.2 iPhone team and roster persistence tests passed");
+console.log("Version 28 iPhone team and roster persistence tests passed");

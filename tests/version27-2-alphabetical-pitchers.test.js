@@ -8,9 +8,9 @@ const html=fs.readFileSync('index.html','utf8');
 const server=fs.readFileSync('netlify/functions/mlb.mts','utf8');
 const manifest=fs.readFileSync('manifest.webmanifest','utf8');
 
-assert.match(app,/const VERSION_NUMBER = 27\.2;/);
-assert.match(html,/Version 27\.2/);
-assert.match(manifest,/Version 27\.2/);
+assert.match(app,/const VERSION_NUMBER = 28;/);
+assert.match(html,/Version 28/);
+assert.match(manifest,/Version 28/);
 assert.match(app,/function comparePitchersAlphabetically\(/);
 assert.match(app,/\.sort\(comparePitchersAlphabetically\)/);
 assert.match(server,/function comparePitchersAlphabetically\(/);
@@ -99,4 +99,4 @@ assert.deepEqual([...positions].sort((a,b)=>a-b),positions,'dropdown must be alp
 assert.match(dropdown,/#39 — Edwin Diaz — RHP — 3-0 — 1.75 ERA — 60 K/,'dropdown must retain full pitcher information');
 assert.match(status.textContent,/Active: #1 — Current Starter/,'current pitcher must remain displayed separately');
 
-console.log('Version 27.2 alphabetical active-roster pitcher dropdown tests passed.');
+console.log('Version 28 alphabetical active-roster pitcher dropdown tests passed.');

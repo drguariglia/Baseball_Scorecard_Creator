@@ -10,7 +10,7 @@ const buttonTags = [...html.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].
   attrs: match[1],
   body: match[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }));
-assert.equal(buttonTags.length, 66, 'Version 27.2 must retain the complete 66-button static interface');
+assert.equal(buttonTags.length, 66, 'Version 28 must retain the complete 66-button static interface');
 
 for (const button of buttonTags) {
   const type = button.attrs.match(/\btype="([^"]+)"/)?.[1];
@@ -19,7 +19,7 @@ for (const button of buttonTags) {
 }
 
 const ids = [...html.matchAll(/<button\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]);
-assert.equal(ids.length, 48, 'Version 27.2 must retain all 48 named buttons');
+assert.equal(ids.length, 48, 'Version 28 must retain all 48 named buttons');
 assert.equal(new Set(ids).size, ids.length, 'button ids must remain unique');
 
 const expectedIds = [
@@ -81,4 +81,4 @@ assert.match(app, /data-record-challenge="\$\{team\}"/g, 'challenge token button
 assert.match(app, /class="danger compact remove-error-button"/, 'dynamic Remove Error button must still be generated');
 assert.match(app, /data-edit-challenge="\$\{event\.id\}"/, 'dynamic Edit Challenge button must still be generated');
 
-console.log('Version 27.2 comprehensive button inventory and wiring audit passed');
+console.log('Version 28 comprehensive button inventory and wiring audit passed');

@@ -5,7 +5,7 @@ const css=fs.readFileSync(path.join(root,'styles.css'),'utf8');
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 const dataModule=require('../baseball-data.js');
 
-assert(html.includes('Version 27'),'visible version must be 26');
+assert(html.includes('Version 28'),'visible version must be 26');
 ['currentBatterName','currentBatterDetails','currentBatterHistory','currentPitcherName','currentPitcherDetails','currentPitcherGameStats'].forEach(id=>assert(html.includes(`id="${id}"`),`missing live matchup field ${id}`));
 assert(!html.includes('class="current-batter-card"'),'separate current batter card must be removed');
 assert(html.indexOf('class="scoring-help"')>html.indexOf('id="quickResultGrid"'),'How to Score must be directly below Quick Results');

@@ -29,6 +29,6 @@ assert.match(app, /const resultKeys=\{[\s\S]*"1":"1B"[\s\S]*w:"BB"[\s\S]*k:"K"/,
 assert.match(css, /\.pitch-button-grid\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/, 'desktop pitch controls must use four columns');
 assert.match(css, /\.strike-button-pair\{display:grid;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/, 'the original strike control footprint must be divided into equal swinging and called halves');
 assert.match(css, /@media \(max-width:760px\)[\s\S]*\.pitch-button-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/, 'phone pitch controls must use two columns');
-assert.match(html, /app\.js\?v=27.2-mobile-roster-save/, 'updated Version 27 app JavaScript must be cache-busted');
+assert.match(html, /app\.js\?v=28-consolidated-abs/, 'updated Version 27 app JavaScript must be cache-busted');
 
 console.log('pitch count and quick scoring tests passed');

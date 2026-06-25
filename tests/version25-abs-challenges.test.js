@@ -1,7 +1,7 @@
 const fs=require("fs"),path=require("path"),vm=require("vm"),assert=require("assert");
 const root=path.resolve(__dirname,"..");
 const app=fs.readFileSync(path.join(root,"app.js"),"utf8"),html=fs.readFileSync(path.join(root,"index.html"),"utf8"),css=fs.readFileSync(path.join(root,"styles.css"),"utf8");
-assert(app.includes("const VERSION_NUMBER = 27"),"Version number must be 26");
+assert(app.includes("const VERSION_NUMBER = 28"),"Version number must be 26");
 ["absChallengeTitle","awayChallengeTokens","homeChallengeTokens","challengeEventLog","challengeDialog","challengeRole","challengeName","challengeResult"].forEach(id=>assert(html.includes(`id=\"${id}\"`),`Missing challenge UI ${id}`));
 ["computeChallengeState","renderChallengeTracker","saveChallenge","challengePdfTokens","challengeLogText"].forEach(name=>assert(app.includes(`function ${name}`),`Missing ${name}`));
 assert(app.includes('roles.includes(prior)'),"Role restrictions should be applied");

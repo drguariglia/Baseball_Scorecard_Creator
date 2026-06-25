@@ -25,3 +25,16 @@
 - PASS: dynamic Remove Error and Edit Challenge controls.
 - PASS: no broken controls or JavaScript runtime errors found.
 - Added `tests/version27-2-comprehensive-button-audit.test.js` to the permanent test suite.
+
+## Version 28 Broadcast-Style Live Game Center — June 25, 2026
+
+- Full inherited automated test suite: PASS
+- JavaScript syntax validation: PASS
+- Score, inning, outs, base diamond, and compact count consolidated inside Pitch-by-Pitch Scoring: PASS
+- Dynamic MLB/manual team abbreviations: PASS
+- Current batter and pitcher data: PASS
+- On-deck and in-the-hole batting-order logic: PASS
+- Desktop standalone visual render: PASS
+- iPhone standalone visual render: PASS
+- Version 27.2 autosave migration compatibility: PASS
+- ZIP and duplicate-ID validation: PASS

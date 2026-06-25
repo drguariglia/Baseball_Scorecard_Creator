@@ -105,5 +105,5 @@ function mockResponse(payload,status=200){return {ok:status>=200&&status<300,sta
   assert.deepEqual(loaded.data.away.pitchers.map(p=>p.name),['Away Starter','Away Reliever One','Away Reliever Two']);
   assert(requested.some(url=>url.includes('/teams/100/roster')),'away active roster must be requested');
   assert(requested.some(url=>url.includes('/teams/200/roster')),'home active roster must be requested');
-  console.log('Version 27.2 active bullpen and reliever dropdown tests passed.');
+  console.log('Version 28 active bullpen and reliever dropdown tests passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

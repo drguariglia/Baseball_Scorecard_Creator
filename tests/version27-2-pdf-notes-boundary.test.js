@@ -46,4 +46,4 @@ assert(calls.every(call=>call.x===432&&call.width===174),'every note line must u
 assert(calls.every(call=>call.top>=611&&call.top<787),'every note line must remain vertically inside the notes box');
 assert(css.includes('.print-notes{overflow:hidden;overflow-wrap:anywhere;word-break:break-word}'),'browser print notes must also be contained');
 
-console.log('Version 27.2 PDF Game Notes boundary checks passed.');
+console.log('Version 28 PDF Game Notes boundary checks passed.');

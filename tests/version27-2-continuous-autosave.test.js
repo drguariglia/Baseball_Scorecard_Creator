@@ -5,8 +5,8 @@ const root=path.resolve(__dirname,"..");
 const app=fs.readFileSync(path.join(root,"app.js"),"utf8");
 const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
 
-assert.match(app,/const AUTOSAVE_STORAGE_KEY = "guariglia-scorecard-v27\.2-autosave-current"/);
-assert.match(app,/const AUTOSAVE_BACKUP_KEY = "guariglia-scorecard-v27\.2-autosave-previous"/);
+assert.match(app,/const AUTOSAVE_STORAGE_KEY = "guariglia-scorecard-v28-autosave-current"/);
+assert.match(app,/const AUTOSAVE_BACKUP_KEY = "guariglia-scorecard-v28-autosave-previous"/);
 assert.match(app,/function persistAutosaveNow\(/);
 assert.match(app,/autosaveTimer=setTimeout\(\(\)=>persistAutosaveNow\(message\),250\)/,"field changes must debounce into a real save");
 assert.match(app,/document\.addEventListener\("input",autosaveFieldChange\)/);
@@ -21,4 +21,4 @@ assert.match(app,/async function openGameFile\(file\)\{[\s\S]*persistAutosaveNow
 assert.match(html,/id="saveNowBtn"/);
 assert.match(html,/id="restoreAutosaveBtn"/);
 assert.match(html,/Every field edit, pitch, play, substitution, challenge, note, and roster change is saved automatically/);
-console.log("Version 27.2 continuous autosave tests passed");
+console.log("Version 28 continuous autosave tests passed");

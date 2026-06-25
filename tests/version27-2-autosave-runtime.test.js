@@ -18,10 +18,11 @@ const elements={
 const context={console,JSON,Date,Math,globalThis:{},alert:msg=>{throw new Error(msg)},confirm:()=>true};
 vm.createContext(context);
 vm.runInContext(`
-const VERSION_NUMBER=27.2;
+const VERSION_NUMBER=28;
 const AUTOSAVE_SCHEMA_VERSION=2;
-const AUTOSAVE_STORAGE_KEY="guariglia-scorecard-v27.2-autosave-current";
-const AUTOSAVE_BACKUP_KEY="guariglia-scorecard-v27.2-autosave-previous";
+const AUTOSAVE_STORAGE_KEY="guariglia-scorecard-v28-autosave-current";
+const AUTOSAVE_BACKUP_KEY="guariglia-scorecard-v28-autosave-previous";
+const LEGACY_AUTOSAVE_KEYS={current:"guariglia-scorecard-v27.2-autosave-current",backup:"guariglia-scorecard-v27.2-autosave-previous",roster:"guariglia-scorecard-v27.2-roster-mirror"};
 let autosaveTimer=null,lastAutosaveStateJson="",autosaveRestoring=false;
 let activePanel="setup";
 let dataState={awayTeam:"Mets",homeTeam:"Phillies",away:{lineup:[],bench:[],pitchers:[]},home:{lineup:[],bench:[],pitchers:[]}};
@@ -34,8 +35,8 @@ const getField=id=>({lookupDate:"2026-06-25",scheduleLevel:"mlb"}[id]||"");
 const setField=()=>{};
 const collectData=()=>deepClone(dataState);
 const setFieldsFromData=data=>{dataState=deepClone(data);};
-const persistRosterMirror=data=>{localStorage.setItem("guariglia-scorecard-v27.2-roster-mirror",JSON.stringify({data:deepClone(data)}));return true;};
-const readRosterMirror=()=>{const raw=localStorage.getItem("guariglia-scorecard-v27.2-roster-mirror");return raw?JSON.parse(raw):null;};
+const persistRosterMirror=data=>{localStorage.setItem("guariglia-scorecard-v28-roster-mirror",JSON.stringify({data:deepClone(data)}));return true;};
+const readRosterMirror=()=>{const raw=localStorage.getItem("guariglia-scorecard-v28-roster-mirror");return raw?JSON.parse(raw):null;};
 const mergeMissingGameData=(current,fallback)=>{const merged=deepClone(current||{});for(const key of ["awayTeam","homeTeam"]){if(!merged[key]&&fallback?.[key])merged[key]=fallback[key];}for(const team of ["away","home"]){if(!merged[team]&&fallback?.[team])merged[team]=deepClone(fallback[team]);}return merged;};
 const setQuickResultsVisible=()=>{};
 const setPanel=id=>{activePanel=id;};
@@ -49,8 +50,8 @@ context.__storage=storage;context.__elements=elements;
 vm.runInContext(block,context,{filename:"autosave-implementation.js"});
 
 vm.runInContext('persistAutosaveNow("first save",{force:true})',context);
-const currentKey='guariglia-scorecard-v27.2-autosave-current';
-const backupKey='guariglia-scorecard-v27.2-autosave-previous';
+const currentKey='guariglia-scorecard-v28-autosave-current';
+const backupKey='guariglia-scorecard-v28-autosave-previous';
 assert.ok(storage.get(currentKey),"first save must create a current snapshot");
 assert.equal(JSON.parse(storage.get(currentKey)).data.awayTeam,"Mets");
 vm.runInContext('dataState.awayTeam="Yankees";persistAutosaveNow("second save")',context);
@@ -61,4 +62,4 @@ assert.equal(vm.runInContext('dataState.awayTeam',context),"Yankees","startup mu
 vm.runInContext('restorePreviousAutosave()',context);
 assert.equal(vm.runInContext('dataState.awayTeam',context),"Mets","Restore Previous Autosave must load the backup");
 assert.equal(JSON.parse(storage.get(backupKey)).data.awayTeam,"Yankees","restoring must preserve the replaced current state as the new backup");
-console.log("Version 27.2 autosave runtime rotation and recovery tests passed");
+console.log("Version 28 autosave runtime rotation and recovery tests passed");

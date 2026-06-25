@@ -43,6 +43,6 @@ assert.match(app, /KEY PLAY/);
 assert.match(data, /function benchList\(/);
 assert.match(data, /bench:\s*benchList\(/);
 assert.match(css, /\.key-play-mark\{/);
-assert.strictEqual(manifest.short_name, 'Scorecard V27.2');
+assert.strictEqual(manifest.short_name, 'Scorecard V28');
 
 console.log('Version 27 game-management tests passed.');
