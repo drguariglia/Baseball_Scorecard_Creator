@@ -357,6 +357,13 @@
     return ["F","D","L","W","C","P"].includes(gameType) ? "standard" : "automatic-runner";
   }
 
+  function managerChallengeAllotmentForGame(feed, schedulePayload) {
+    const gameData = feed?.gameData || {};
+    const scheduleGame = schedulePayload?.dates?.[0]?.games?.[0] || {};
+    const gameType = gameData?.game?.type || scheduleGame?.gameType || "R";
+    return ["A","F","D","L","W","C","P"].includes(gameType) ? "2" : "1";
+  }
+
   function buildGameData(feed, schedulePayload, people = {}, rosters = {}) {
     const gameData = feed?.gameData || {};
     const box = feed?.liveData?.boxscore || {};
@@ -383,6 +390,7 @@
       venue: gameData?.venue?.name || scheduleGame?.venue?.name || "",
       gameNumber: "",
       extraInningsRule: extraInningsRuleForGame(feed, schedulePayload),
+      managerChallengeAllotment: managerChallengeAllotmentForGame(feed, schedulePayload),
       weather: weatherParts.join(", "),
       umpires: (box?.officials || []).map(officialLabel).join("; "),
       broadcast: broadcasts.tv,

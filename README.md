@@ -1,6 +1,89 @@
-# Guariglia Baseball Scorecard Builder — Version 27.2
+# Guariglia Baseball Scorecard Builder
 
-Version 27.2 is the current testing build, combining the Game Management Update with regulation-game rules, extra-inning continuation pages, active-roster pitcher selection, and corrected pitching exports. It retains the approved Version 24 classic PDF foundation and all Version 25/26 scoring, pitch-tracking, ABS, and live-matchup capabilities.
+## Version 32 — Manager Replay, ABS, and Complete PDF Pitching Lines
+
+Version 32 preserves the complete Version 31 live-scorecard workflow and adds a dedicated **Manager Replay** tracker that is independent from the existing **ABS ball-strike challenge** tracker.
+
+
+### Version 32 Mobile Application Audit
+
+- Audited every primary section, dialog, field type, and live-scoring control at 320, 360, 390, and 430-pixel portrait widths plus phone landscape.
+- Standardizes touch fields and controls to mobile-safe 16-pixel form text and 44-pixel touch targets.
+- Preserves sticky mobile navigation by replacing page-level horizontal hiding with clipping.
+- Keeps the Plate Appearances / Current Scorecard selector visible below the autosave and section-navigation bars.
+- Adds accessible pressed-state reporting to both scoring-view buttons.
+- Verifies that end-of-inning divider lines appear in both mobile views.
+- Keeps the player-name column fixed while the Current Scorecard innings scroll horizontally.
+- Adds mobile scorecard swipe guidance and dynamic-viewport dialog sizing.
+- Complete 44-file regression suite, JavaScript syntax validation, and five-viewport browser audit passed.
+- This maintenance update remains **Version 32**.
+
+### Manager Replay
+
+- Defaults to **one challenge per team** for regular-season and most games.
+- Supports **two challenges per team** for postseason and All-Star games.
+- Retains a challenge whenever the challenged call is overturned.
+- Consumes a challenge when the ruling is confirmed or the call stands.
+- Records the inning, half-inning, challenged play, result, and optional notes.
+- Includes manager replay status in browser autosave, saved game data, summaries, Game Notes, Excel output, and PDF output.
+- Uses MLB schedule game type data to choose the ordinary-game or postseason/All-Star starting allotment when available; the setting remains editable.
+
+### ABS Challenges
+
+- Remain a separate system with their own team counts, event log, success retention, and extra-inning grant behavior.
+- Manager replay outcomes never change ABS availability, and ABS outcomes never change manager replay availability.
+
+### Version 32 ABS Batter-Initiator Maintenance Update
+
+- The ABS challenge dialog now always displays all three MLB-authorized initiators: **Batter, Pitcher, and Catcher**.
+- Selecting **Batter** automatically assigns the batting team and records the challenged umpire call as a **called strike**.
+- Selecting **Pitcher** or **Catcher** automatically assigns the fielding team and records the challenged umpire call as a **called ball**.
+- The linked pitch is filtered to the proper type: a batter challenge links only to a called strike, while a pitcher/catcher challenge links only to a called ball.
+- The dialog explains that the request must be immediate and cannot come from a manager, coach, dugout, or uninvolved player.
+- Successful challenges remain available; unsuccessful challenges are lost, and the existing extra-inning grant behavior remains intact.
+- This maintenance update remains **Version 32** and refreshes the browser/service-worker cache key so installed copies receive the correction.
+
+### Version 32 PDF Pitching-Line Maintenance Update
+
+- The PDF now places each pitcher's calculated game line beside the correct pitcher in the dedicated **IP, H, R, ER, BB, K, and HP** columns.
+- Innings pitched are calculated from recorded outs using baseball notation such as `6.0`, `6.1`, and `6.2`.
+- Pitcher appearance order remains starter first, followed by relievers in the order they entered.
+- Hits, walks, intentional walks, strikeouts, hit batters, runs, and earned runs are derived from the live scoring record.
+- Runners retain responsibility when a pitching change occurs, so an inherited runner is charged to the pitcher who put that runner on base.
+- The automatic extra-inning runner remains an unearned run when scored.
+- The maintenance update remains **Version 32** and uses a refreshed Version 32 browser cache key so installed copies receive the correction.
+
+### Compatibility
+
+- Version 31 browser autosaves and roster mirrors migrate automatically.
+- All Version 31 plate-appearance/current-scorecard views, half-inning dividers, interference, substitutions, pitching changes, pitch tracking, game management, Excel export, and PDF export remain intact.
+- Version 32 adds dedicated structural and runtime tests for the manager replay rules and for manager replay/ABS separation.
+
+**Version 28 update:** The ABS challenge tracker is consolidated inside the Live Game Center, with compact team controls and an expandable challenge log. — Version 28
+
+## Version 28 — Broadcast-Style Live Game Center
+
+- Moves the score, inning, outs, base diamond, and ball-strike count into the Pitch-by-Pitch Scoring console.
+- Uses a compact two-team score display with dynamic team abbreviations and full team names.
+- Displays top/bottom inning direction with `▲` or `▼`, plus the current inning number.
+- Reduces the ball-strike count to approximately half the visual size of the prior oversized count.
+- Keeps base occupancy prominent in the center of the scorebox.
+- Integrates the current batter and pitcher, including full available player data and live game statistics.
+- Adds the next batter **On Deck** and the following batter **In the Hole**, updated automatically as the batting order advances and substitutions occur.
+- Places the Live Game Center before the ABS challenge area so the primary scoring controls and game situation are immediately visible.
+- Includes dedicated desktop, tablet, and iPhone layouts.
+- Migrates existing Version 27.2 browser autosaves into Version 28 on first opening.
+
+## Version 30 Interference Scoring
+
+- Adds an **Interference** Quick Result and a **Record Interference** control inside every play dialog.
+- Supports batter interference, runner interference, offensive team member or coach interference, catcher/defensive interference, umpire interference involving a fair batted ball, umpire interference with a catcher’s throw, fan/spectator interference, authorized-person interference, and a custom category.
+- Records the person involved, the umpire’s ruling, outs, runs, runner placements, whether the batting order advances, whether an official at-bat is charged, and whether a hit is credited.
+- Defaults follow the applicable MLB rule pattern but remain editable because the umpire’s placement and scoring ruling depend on the specific play.
+- Preserves the live count for interference events that do not end the plate appearance.
+- Uses compact notation (`BI`, `RI`, `OI`, `CI`, `UI`, `FI`, or `INT`) in the scorecard and carries full details into the play log, Game Notes, saved game, Excel, and PDF.
+- Catcher interference can also be assigned to the responsible defensive player as an individual error.
+- Obstruction remains a separate result because MLB rules distinguish obstruction from interference.
 
 ## Game Notes and Key Plays
 
@@ -8,7 +91,7 @@ Version 27.2 is the current testing build, combining the Game Management Update 
 - Appearance notes are assembled chronologically from the first recorded plate appearance through the last.
 - Each note includes the inning, batter, at-bat result, and the note entered for that appearance.
 - A compact **Key Play** toggle prefixes the note with `KEY PLAY`, marks the scoring cell, and identifies the event in Game Notes.
-- Manual Game Notes, substitutions, pitching changes, and ABS challenge information are retained in the exported timeline.
+- Manual Game Notes, substitutions, pitching changes, manager replay reviews, and ABS challenge information are retained in the exported timeline.
 
 ## Position-Player Substitutions
 
@@ -51,11 +134,11 @@ Version 27.2 is the current testing build, combining the Game Management Update 
 - Full game-state undo and rebuild
 - MLB/MiLB schedule and game-data lookup
 - Sharpened 300-DPI classic one-page PDF
-- Home-team MLB color palettes
+- One consistent Guariglia brown, burnt-orange, gold, and cream palette across the app and PDF
 - Excel, PDF, saved-game, and pitch-log CSV exports
 - Optional traditional guides on blank PDFs
 
-Version 24 remains the approved production baseline until Version 27 is explicitly approved. Version 27.2 is the current testing build.
+Version 32 is the current approved production and controlling baseline.
 
 
 
@@ -94,3 +177,49 @@ The Settings section includes **Save Now** and **Restore Previous Autosave**. Sa
 
 ### Version 27.2 iPhone roster persistence
 Team names, lineup and bench players, and pitchers now have a protected field cache and an independent browser-storage roster mirror. This prevents iPhone Safari or the installed web app from replacing restored roster fields with blanks while retaining scoring data. Intentional edits and resets still work normally.
+
+
+## Version 30 iPhone date-field correction
+
+The Setup screen date controls are now constrained to the available mobile card width. The scheduled-game and manual date inputs use iPhone-safe sizing, preserve the native calendar picker, and no longer widen or overflow the startup screen.
+
+## Version 32 plate-appearance RBI display correction
+
+Plate-appearance scoring boxes no longer repeat RBI text. RBI values are still calculated normally and continue to populate each batter's dedicated RBI column in the app, Excel export, and PDF scorecard. Run totals are also omitted from the scoring box, so each box contains only the recorded play result and essential play detail. Home runs continue to display simply as `HR`.
+
+## Version 32 Runner Events and Wild-Pitch Column
+
+- Adds a dedicated **Runner Event** workflow that does not end or reset the current plate appearance.
+- Records stolen bases and caught stealing, including the responsible runner and destination.
+- Records every pickoff attempt and its result: safe, picked off, advanced, advanced on an error/overthrow, or balk/disengagement violation.
+- Records wild pitches, passed balls, and defensive indifference with all affected runner destinations, runs, and outs.
+- Attributes SB, CS, and defensive indifference to the batting team; attributes pickoff attempts, successful pickoffs, WP, and PB to the fielding team.
+- Supports WP or PB classification when a batter reaches on a third strike that was not caught.
+- Adds SB and CS to batter totals; adds WP, pickoff attempts, and successful pickoffs to pitcher tracking.
+- Adds a dedicated **WP** pitching column immediately to the right of HP and before Game Notes in the classic PDF and Excel scorecard.
+- Preserves runner events through autosave, saved-game files, Undo Last Play, editing, summaries, Game Notes, Excel, and PDF export.
+- Passed-ball runs recorded through this workflow are not credited as earned solely because of the passed ball.
+- Version number remains **32**.
+
+
+## Version 32 Plate-Appearance Result-Only Display
+
+Plate-appearance boxes now contain only the play result and essential play detail. Run and RBI totals no longer appear inside the boxes; those values continue to populate their dedicated columns in the app, Excel export, and PDF scorecard.
+
+## Version 32 Pitch-by-Pitch Operational Audit
+
+Version 32 was replay-tested in Chromium with game-based pitch and runner-event sequences. The audit covered pitch controls, automatic walks and strikeouts, ABS challenges by batter/pitcher/catcher, manager replay, steals, every pickoff result, wild pitches, passed balls, defensive indifference, third strikes not caught, undo/edit/delete, autosave, and all exports.
+
+Corrections made during the audit:
+
+- An overturned ABS challenge now changes the linked pitch and recalculates the live count.
+- A terminal overturned call now removes the invalid automatic walk or looking strikeout and creates the correct replacement result.
+- Reversing strike three that ended a half-inning restores the correct half, outs, bases, and batting order.
+- Deleting an upheld terminal challenge no longer resurrects a completed 4–0 or 0–3 count.
+- Third-strike-not-caught notation is now `K WP` or `K PB`.
+
+The permanent regression suite now includes `tests/version32-pitch-by-pitch-audit.test.js`. See `VERSION_32_PITCH_BY_PITCH_AUDIT.md` for the complete test matrix and findings. The version number remains **32**.
+
+## Version 32 Excel pitch-count formatting correction
+
+The Pitch Log CSV now protects the **Count Before** and **Count After** columns from Microsoft Excel's automatic date conversion. Counts such as `0-1`, `1-2`, and `2-1` open and display as ball-strike counts. All other pitch-log fields remain unchanged.

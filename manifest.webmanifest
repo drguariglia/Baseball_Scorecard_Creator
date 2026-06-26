@@ -1,7 +1,7 @@
 {
-  "name": "Guariglia Baseball Scorecard Builder Version 28",
-  "short_name": "Scorecard V28",
-  "description": "Baseball scorecard builder with live substitutions, individual error assignment, key-play notes, MLB ABS challenge tracking, permanent pitch tracking, and sharpened team-color PDFs.",
+  "name": "Guariglia Baseball Scorecard Builder Version 32",
+  "short_name": "Scorecard V32",
+  "description": "Baseball scorecard builder with separate MLB manager replay and ABS challenge tracking, live scorecard views, continuous autosave, substitutions, errors, interference, pitch tracking, Excel, and multi-page PDF export.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fff8e9",

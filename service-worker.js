@@ -1,17 +1,17 @@
-const CACHE = "guariglia-scorecard-v27-2-mobile-roster-save";
+const CACHE = "guariglia-scorecard-v32-excel-count-text";
 const CORE_ASSETS = [
-  "/styles.css?v=27.2-mobile-roster-save",
-  "/app.js?v=27.2-mobile-roster-save",
-  "/baseball-data.js?v=27.2",
+  "/styles.css?v=32-excel-count-text",
+  "/app.js?v=32-excel-count-text",
+  "/baseball-data.js?v=32",
   "/template_data.js",
-  "/pdf_background_data.js?v=27.2",
+  "/pdf_background_data.js?v=32",
   "/vendor/jszip.min.js",
   "/assets/guariglia-crest.gif",
   "/assets/icon-192.png",
   "/assets/icon-512.png",
   "/assets/Scorecard_20260615_blank_template.xlsx",
   "/assets/Scorecard_20260615_App_Colors_Classic_Blank.xlsx",
-  "/assets/classic-scorecard-background.jpg?v=27.2-mobile-roster-save",
+  "/assets/classic-scorecard-background.jpg?v=32-excel-count-text",
   "/manifest.webmanifest"
 ];
 
