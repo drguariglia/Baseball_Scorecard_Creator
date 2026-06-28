@@ -1,7 +1,7 @@
 {
-  "name": "Guariglia Baseball Scorecard Builder Version 32",
-  "short_name": "Scorecard V32",
-  "description": "Baseball scorecard builder with separate MLB manager replay and ABS challenge tracking, live scorecard views, continuous autosave, substitutions, errors, interference, pitch tracking, Excel, and multi-page PDF export.",
+  "name": "Guariglia Baseball Scorecard Builder Version 33",
+  "short_name": "Scorecard V33",
+  "description": "Version 33 supersedes Version 32 and adds an MLB-aligned visual field selector that records complete defensive ball paths such as 6-3 and 6-4-3, while home runs record without a location popup.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fff8e9",

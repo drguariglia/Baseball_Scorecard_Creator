@@ -29,10 +29,11 @@ const INTERFERENCE_RULINGS = [
 ];
 const POSITION_NUMBERS = {P:"1",C:"2","1B":"3","2B":"4","3B":"5",SS:"6",LF:"7",CF:"8",RF:"9"};
 const LEGACY_STORAGE_PREFIXES = ["guariglia-scorecard", "scorecard20260615"];
-const AUTOSAVE_STORAGE_KEY = "guariglia-scorecard-v32-autosave-current";
-const AUTOSAVE_BACKUP_KEY = "guariglia-scorecard-v32-autosave-previous";
-const AUTOSAVE_ROSTER_KEY = "guariglia-scorecard-v32-roster-mirror";
+const AUTOSAVE_STORAGE_KEY = "guariglia-scorecard-v33-autosave-current";
+const AUTOSAVE_BACKUP_KEY = "guariglia-scorecard-v33-autosave-previous";
+const AUTOSAVE_ROSTER_KEY = "guariglia-scorecard-v33-roster-mirror";
 const LEGACY_AUTOSAVE_KEYS = [
+  {label:"Version 32",current:"guariglia-scorecard-v32-autosave-current",backup:"guariglia-scorecard-v32-autosave-previous",roster:"guariglia-scorecard-v32-roster-mirror"},
   {label:"Version 31",current:"guariglia-scorecard-v31-autosave-current",backup:"guariglia-scorecard-v31-autosave-previous",roster:"guariglia-scorecard-v31-roster-mirror"},
   {label:"Version 30",current:"guariglia-scorecard-v30-autosave-current",backup:"guariglia-scorecard-v30-autosave-previous",roster:"guariglia-scorecard-v30-roster-mirror"},
   {label:"Version 29",current:"guariglia-scorecard-v29-autosave-current",backup:"guariglia-scorecard-v29-autosave-previous",roster:"guariglia-scorecard-v29-roster-mirror"},
@@ -41,7 +42,7 @@ const LEGACY_AUTOSAVE_KEYS = [
 ];
 const AUTOSAVE_SCHEMA_VERSION = 2;
 const TEMPLATE_FILE_NAME = "Scorecard_20260615_blank_template.xlsx";
-const VERSION_NUMBER = 32;
+const VERSION_NUMBER = 33;
 const DEFAULT_SCORECARD_COLORS = {primary:"#3D2519",secondary:"#9B4D1F",accent:"#D9A441"};
 const MLB_TEAM_COLOR_RECORDS = [
   {aliases:["arizona diamondbacks","diamondbacks","ari"],primary:"#A71930",secondary:"#000000",accent:"#E3D4AD"},
@@ -103,6 +104,22 @@ const OUTCOMES = [
   {id:"OTHER", label:"Other / Custom Play", code:"OTH", ab:false}
 ];
 const OUTCOME_MAP = Object.fromEntries(OUTCOMES.map(o => [o.id, o]));
+const FIELD_POSITIONS = [
+  {number:"1",code:"P",label:"Pitcher"},
+  {number:"2",code:"C",label:"Catcher"},
+  {number:"3",code:"1B",label:"First Base"},
+  {number:"4",code:"2B",label:"Second Base"},
+  {number:"5",code:"3B",label:"Third Base"},
+  {number:"6",code:"SS",label:"Shortstop"},
+  {number:"7",code:"LF",label:"Left Field"},
+  {number:"8",code:"CF",label:"Center Field"},
+  {number:"9",code:"RF",label:"Right Field"}
+];
+const FIELD_POSITION_COORDS = {"1":[50,63],"2":[50,87],"3":[76,68],"4":[63,50],"5":[24,68],"6":[37,50],"7":[19,29],"8":[50,17],"9":[81,29]};
+const BATTED_BALL_OUTCOMES = new Set(["1B","2B","3B","ROE","FC","GO","FO","LO","PO","SF","SH","DP","TP"]);
+const MULTI_FIELDER_OUTCOMES = new Set(["ROE","FC","GO","SH","DP","TP"]);
+let pendingFieldLocationAction = null;
+let pendingFieldingSequence = [];
 const QUICK_RESULTS = [
   ["1B","Single"],["2B","Double"],["3B","Triple"],["HR","Home Run"],
   ["BB","Walk"],["HBP","Hit by Pitch"],["K","Strikeout"],["KL","Looking K"],
@@ -698,6 +715,95 @@ function addPitch(type){
   renderPitchConsole();
   scheduleAutosave("Pitch recorded");
 }
+function fieldPositionRecord(value){return FIELD_POSITIONS.find(position=>position.number===String(value||""))||null;}
+function fieldPositionLabel(value){const position=fieldPositionRecord(value);return position?`${position.number} — ${position.label} (${position.code})`:"";}
+function normalizeFieldingSequence(value,fallback=""){
+  const raw=Array.isArray(value)?value:String(value||fallback||"").match(/[1-9]/g)||[];
+  return raw.map(String).filter(number=>Boolean(fieldPositionRecord(number)));
+}
+function fieldingSequenceString(value,fallback=""){return normalizeFieldingSequence(value,fallback).join("-");}
+function fieldingSequenceLabel(value,fallback=""){
+  const sequence=normalizeFieldingSequence(value,fallback);
+  return sequence.map(number=>fieldPositionLabel(number)).filter(Boolean).join(" → ");
+}
+function outcomeRequiresFieldLocation(outcomeId){return BATTED_BALL_OUTCOMES.has(outcomeId);}
+function outcomeSupportsBallPath(outcomeId){return outcomeRequiresFieldLocation(outcomeId);}
+function selectedBallPathFromForm(){return fieldingSequenceString($("playFieldingSequence")?.value,$("playFieldLocation")?.value);}
+function renderPendingFieldingSequence(){
+  const tray=$("fieldingSequenceTray"),done=$("useFieldingSequenceBtn"),undo=$("undoFieldingSequenceBtn"),clear=$("clearFieldingSequenceBtn");
+  if(tray){
+    tray.innerHTML=pendingFieldingSequence.length?pendingFieldingSequence.map((number,index)=>{const position=fieldPositionRecord(number);return `<span class="fielding-sequence-step"><b>${index+1}</b><strong>${number}</strong><small>${escapeHtml(position?.code||"")}</small></span>`;}).join('<span class="fielding-sequence-arrow" aria-hidden="true">→</span>'):'<span class="fielding-sequence-empty">Tap the first fielder who handled the ball.</span>';
+    tray.setAttribute("aria-label",pendingFieldingSequence.length?`Ball path ${pendingFieldingSequence.join(" to ")}`:"No fielders selected");
+  }
+  const pathSvg=$("fieldBallPathSvg"),points=pendingFieldingSequence.map(number=>FIELD_POSITION_COORDS[number]).filter(Boolean);
+  if(pathSvg){
+    const pointText=points.map(point=>point.join(",")).join(" "),last=points.at(-1);
+    pathSvg.innerHTML=points.length?`${points.length>1?`<polyline points="${pointText}"/>`:""}${points.map((point,index)=>`<circle class="field-ball-path-stop" cx="${point[0]}" cy="${point[1]}" r="${index===points.length-1?2.5:1.7}"/>`).join("")}${last?`<circle class="field-ball-current" cx="${last[0]}" cy="${last[1]}" r="3.2"/>`:""}`:"";
+  }
+  if(done){done.disabled=!pendingFieldingSequence.length;done.textContent=pendingFieldingSequence.length===1?"Use This Fielder":"Use Ball Path";}
+  if(undo)undo.disabled=!pendingFieldingSequence.length;
+  if(clear)clear.disabled=!pendingFieldingSequence.length;
+  document.querySelectorAll("#fieldLocationGrid [data-field-position]").forEach(button=>{
+    const count=pendingFieldingSequence.filter(number=>number===button.dataset.fieldPosition).length;
+    button.classList.toggle("is-in-path",count>0);
+    button.dataset.pathCount=count?String(count):"";
+  });
+}
+function populateFieldLocationControls(selected="",selectedSequence=""){
+  const sequence=normalizeFieldingSequence(selectedSequence,selected),first=sequence[0]||"",select=$("playFieldLocation");
+  if(select)select.innerHTML=`<option value="">Choose position 1–9</option>`+FIELD_POSITIONS.map(position=>`<option value="${position.number}" ${position.number===first?"selected":""}>${position.number} — ${escapeHtml(position.label)} (${position.code})</option>`).join("");
+  const grid=$("fieldLocationGrid");
+  if(grid)grid.innerHTML=`<svg class="field-map-art" viewBox="0 0 600 500" preserveAspectRatio="none" aria-hidden="true" focusable="false"><defs><linearGradient id="fieldGrassV33" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#76b85b"/><stop offset="1" stop-color="#3f7f35"/></linearGradient><linearGradient id="fieldDirtV33" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d8ad72"/><stop offset="1" stop-color="#b87942"/></linearGradient><pattern id="fieldStripeV33" width="52" height="52" patternUnits="userSpaceOnUse" patternTransform="rotate(38)"><rect width="26" height="52" fill="rgba(255,255,255,.055)"/><rect x="26" width="26" height="52" fill="rgba(0,0,0,.035)"/></pattern></defs><rect x="3" y="3" width="594" height="494" rx="34" fill="#315f2c" stroke="#704321" stroke-width="6"/><path d="M300 486 L35 226 Q300 -12 565 226 Z" fill="url(#fieldGrassV33)"/><path d="M300 486 L35 226 Q300 -12 565 226 Z" fill="url(#fieldStripeV33)"/><path d="M300 472 L154 340 L300 208 L446 340 Z" fill="url(#fieldDirtV33)" stroke="#a46735" stroke-width="4"/><path d="M300 424 L210 340 L300 257 L390 340 Z" fill="#5a963f" stroke="rgba(255,255,255,.25)" stroke-width="2"/><path d="M300 472 L35 226 M300 472 L565 226" fill="none" stroke="#f9efd8" stroke-width="5" stroke-linecap="round" opacity=".95"/><path d="M300 472 L154 340 L300 208 L446 340 Z" fill="none" stroke="#f4e0bd" stroke-width="4" opacity=".92"/><circle cx="300" cy="340" r="25" fill="#c99159" stroke="#9b6538" stroke-width="3"/><rect x="291" y="335" width="18" height="6" rx="3" fill="#f8eedb"/><g fill="#fff9e9" stroke="#8e603c" stroke-width="3"><rect x="435" y="329" width="22" height="22" transform="rotate(45 446 340)"/><rect x="289" y="197" width="22" height="22" transform="rotate(45 300 208)"/><rect x="143" y="329" width="22" height="22" transform="rotate(45 154 340)"/><path d="M286 462 L314 462 L320 475 L300 489 L280 475 Z"/></g><path d="M77 228 Q300 37 523 228" fill="none" stroke="rgba(255,255,255,.20)" stroke-width="3"/><path d="M116 264 Q300 109 484 264" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="3"/></svg><svg id="fieldBallPathSvg" class="field-ball-path" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"></svg>`+FIELD_POSITIONS.map(position=>`<button type="button" class="field-location-button field-pos-${position.number}" data-field-position="${position.number}" data-field-code="${position.code}" aria-label="Add ${position.number}, ${escapeHtml(position.label)}, to ball path"><strong>${position.number}</strong><span>${position.code}</span><small>${escapeHtml(position.label)}</small></button>`).join("");
+  pendingFieldingSequence=[...sequence];renderPendingFieldingSequence();
+}
+function updatePlayFieldLocationVisibility(outcomeId,selected="",selectedSequence=""){
+  const required=outcomeRequiresFieldLocation(outcomeId),section=$("playFieldLocationSection"),select=$("playFieldLocation"),sequenceInput=$("playFieldingSequence"),display=$("playFieldingSequenceDisplay"),sequence=required?normalizeFieldingSequence(selectedSequence,selected):[];
+  if(section)section.hidden=!required;
+  if(select){select.required=false;select.value=sequence[0]||"";}
+  if(sequenceInput)sequenceInput.value=sequence.join("-");
+  if(display)display.value=sequence.length?sequence.join("-"):"No ball path selected";
+}
+function closeFieldLocationDialog(){pendingFieldLocationAction=null;pendingFieldingSequence=[];$("fieldLocationDialog").close();}
+function openFieldLocationDialog(outcomeId,action={}){
+  if(outcomeId==="HR"){
+    if(action.mode==="play-form")updatePlayFieldLocationVisibility("HR");
+    else recordQuickOutcome("HR",Boolean(action.forceDirect),Boolean(action.skipPitchPreparation),"","");
+    return;
+  }
+  const outcome=OUTCOME_MAP[outcomeId],sequence=normalizeFieldingSequence(action.sequence,action.selected||action.fieldLocation||"");
+  pendingFieldLocationAction={outcomeId,...action};
+  populateFieldLocationControls(sequence[0]||"",sequence);
+  $("fieldLocationTitle").textContent=`${outcome?.label||"Batted ball"} — Follow the ball`;
+  $("fieldLocationPrompt").textContent=MULTI_FIELDER_OUTCOMES.has(outcomeId)?"Tap each fielder in the order the ball traveled. Example: shortstop to first base is 6–3.":"Tap the primary fielder. Add another fielder only when you want to record a relay or continuing play.";
+  $("fieldLocationDialog").showModal();
+}
+function applyFieldLocationSelection(position){
+  if(!pendingFieldLocationAction)return;
+  const selected=String(position||"");if(!fieldPositionRecord(selected))return;
+  pendingFieldingSequence.push(selected);renderPendingFieldingSequence();
+}
+function undoFieldingSequence(){pendingFieldingSequence.pop();renderPendingFieldingSequence();}
+function clearFieldingSequence(){pendingFieldingSequence=[];renderPendingFieldingSequence();}
+function completeFieldingSequence(){
+  const action=pendingFieldLocationAction,sequence=normalizeFieldingSequence(pendingFieldingSequence);if(!action||!sequence.length)return;
+  const fieldLocation=sequence[0],fieldingSequence=sequence.join("-");
+  pendingFieldLocationAction=null;pendingFieldingSequence=[];$("fieldLocationDialog").close();
+  if(action.mode==="play-form"){
+    updatePlayFieldLocationVisibility($("playOutcome").value,fieldLocation,fieldingSequence);return;
+  }
+  if(action.mode==="dialog"){
+    openPlayDialog(action.team,action.playerIndex,action.paIndex,action.outcomeId,action.existing||null,{fieldLocation,fieldingSequence});
+    if(action.showError)showErrorAssignmentPanel(action.existing?.fieldingErrors||[],action.existing?.errorDetails||"");
+    return;
+  }
+  recordQuickOutcome(action.outcomeId,Boolean(action.forceDirect),Boolean(action.skipPitchPreparation),fieldLocation,fieldingSequence);
+}
+function requestQuickOutcome(outcomeId,forceDirect=false,skipPitchPreparation=false){
+  if(outcomeId==="HR")return recordQuickOutcome(outcomeId,forceDirect,skipPitchPreparation,"","");
+  if(outcomeRequiresFieldLocation(outcomeId)){openFieldLocationDialog(outcomeId,{mode:"quick",forceDirect,skipPitchPreparation});return null;}
+  return recordQuickOutcome(outcomeId,forceDirect,skipPitchPreparation,"","");
+}
+
 function prepareTerminalPitch(outcomeId){
   ensureScoringState();
   const last=scoring.count.history.at(-1);
@@ -712,22 +818,25 @@ function outcomeCanQuickSave(outcomeId){
   if(["BB","IBB","HBP","K","KL"].includes(outcomeId))return true;
   return !basesOccupied&&["1B","2B","3B","HR","GO","FO","LO","PO"].includes(outcomeId);
 }
-function recordQuickOutcome(outcomeId,forceDirect=false,skipPitchPreparation=false){
+function recordQuickOutcome(outcomeId,forceDirect=false,skipPitchPreparation=false,fieldLocation="",fieldingSequence=""){
   if(gameIsFinal()){alert("This game is final. Use Undo Last Play if the ending needs correction.");return null;}
   ensureScoringState();
   if(outcomeId!=="D3K")scoring.lastAutoStrikeoutPlayId="";
   if(!skipPitchPreparation)prepareTerminalPitch(outcomeId);
   const team=currentBattingTeam(),playerIndex=scoring.battingIndexes[team]||0,paIndex=currentPaIndex(team,playerIndex);
+  const normalizedPath=fieldingSequenceString(fieldingSequence,fieldLocation);
+  if(outcomeRequiresFieldLocation(outcomeId)&&!normalizedPath){openFieldLocationDialog(outcomeId,{mode:"quick",forceDirect,skipPitchPreparation:true});return null;}
+  fieldLocation=normalizeFieldingSequence(normalizedPath)[0]||"";fieldingSequence=normalizedPath;
   if(outcomeId==="D3K"||outcomeId==="OTHER"||(!forceDirect&&!outcomeCanQuickSave(outcomeId))){
-    openPlayDialog(team,playerIndex,paIndex,outcomeId);
+    openPlayDialog(team,playerIndex,paIndex,outcomeId,null,{fieldLocation,fieldingSequence});
     return null;
   }
   const defaults=defaultDetails(outcomeId,team,playerIndex).d;
-  const incoming={team,playerIndex,paIndex,outcome:outcomeId,pitcher:currentPitcherName(team),inning:scoring.inning,half:scoring.half,runs:defaults.runs,rbi:defaults.rbi,outsOnPlay:defaults.outs,errors:defaults.errors,destinations:{batter:defaults.batter,r1:defaults.r1,r2:defaults.r2,r3:defaults.r3},notes:""};
+  const incoming={team,playerIndex,paIndex,outcome:outcomeId,fieldLocation,fieldingSequence,pitcher:currentPitcherName(team),inning:scoring.inning,half:scoring.half,runs:defaults.runs,rbi:defaults.rbi,outsOnPlay:defaults.outs,errors:defaults.errors,destinations:{batter:defaults.batter,r1:defaults.r1,r2:defaults.r2,r3:defaults.r3},notes:""};
   return commitPlay(incoming,"");
 }
 function handleQuickOutcome(outcomeId){
-  recordQuickOutcome(outcomeId,false);
+  requestQuickOutcome(outcomeId,false);
 }
 function openDroppedThirdStrikeCorrection(play){
   const defaults=defaultDetails("D3K",play.team,play.playerIndex,play.beforeState?.bases||emptyBases(),play.beforeState?.outs??0).d;
@@ -741,7 +850,7 @@ function handleTerminalStrikeout(outcomeId){
     if(play)openDroppedThirdStrikeCorrection(play);
     return;
   }
-  recordQuickOutcome(outcomeId,true);
+  requestQuickOutcome(outcomeId,true);
 }
 function setQuickResultsVisible(visible){
   const grid=$("quickResultGrid"),button=$("toggleQuickResultsBtn");
@@ -1151,7 +1260,7 @@ function currentScorecardLineScore(startInning=1){
   for(let inning=startInning;inning<=end;inning++)html+=`<th>${inning}</th>`;
   html+='<th>R</th><th>H</th><th>E</th></tr></thead><tbody>';
   for(const team of ["away","home"]){html+=`<tr><th>${escapeHtml(teamName(team))}</th>`;for(let inning=startInning;inning<=end;inning++)html+=`<td>${totals[team].innings[inning-1]||0}</td>`;html+=`<td><strong>${totals[team].runs}</strong></td><td>${totals[team].hits}</td><td>${totals[team].errors}</td></tr>`;}
-  return html+'</tbody></table>';
+  return '<div class="current-scorecard-table-wrap current-line-score-wrap">'+html+'</tbody></table></div>';
 }
 function buildCurrentScorecardTeam(team,label,startInning,endingPlays){
   const stats=computeTeamStats(team),end=startInning+9;let html=`<section class="current-scorecard-team"><h3>${escapeHtml(label)}: ${escapeHtml(teamName(team))}</h3><div class="current-scorecard-table-wrap"><table><thead><tr><th class="current-player-column">Player / No.</th>`;
@@ -1327,12 +1436,13 @@ function toggleInterferencePanel(){
   else closeInterferencePanel();
 }
 
-function openPlayDialog(team,playerIndex,paIndex,outcomeId,existing=null){
+function openPlayDialog(team,playerIndex,paIndex,outcomeId,existing=null,prefill={}){
   const data=collectData(),player=existing?.playerSnapshot||activeBatter(team,playerIndex);
   $("dialogTeam").value=team;$("dialogPlayerIndex").value=playerIndex;$("dialogPaIndex").value=paIndex;$("dialogPlayId").value=existing?.id||"";
   ensureScoringState();
   $("dialogTitle").textContent=`${player.name||`Batter ${playerIndex+1}`} — PA ${paIndex+1} — ${existing?.pitchCount?countLabel(existing.pitchCount):countLabel()}`;
   $("playOutcome").innerHTML=OUTCOMES.map(o=>`<option value="${o.id}">${escapeHtml(o.code)} — ${escapeHtml(o.label)}</option>`).join("");
+  populateFieldLocationControls(existing?.fieldLocation||prefill.fieldLocation||"",existing?.fieldingSequence||prefill.fieldingSequence||"");
   fillDestinationSelect("batterDestination",BATTER_DESTINATIONS); ["runner1Destination","runner2Destination","runner3Destination"].forEach(id=>fillDestinationSelect(id,DESTINATIONS));
   const defaults=defaultDetails(outcomeId,team,playerIndex,existing?.beforeState?.bases||null,existing?.beforeState?.outs??null); const v=existing||{};
   $("playOutcome").value=v.outcome||outcomeId; $("playPitcher").value=v.pitcher||currentPitcherName(team); $("playInning").value=v.inning||scoring.inning; $("playHalf").value=v.half||(team==="away"?"top":"bottom");
@@ -1340,7 +1450,7 @@ function openPlayDialog(team,playerIndex,paIndex,outcomeId,existing=null){
   $("batterDestination").value=v.destinations?.batter||defaults.d.batter; $("runner1Destination").value=v.destinations?.r1||defaults.d.r1; $("runner2Destination").value=v.destinations?.r2||defaults.d.r2; $("runner3Destination").value=v.destinations?.r3||defaults.d.r3; $("playNotes").value=v.notes||"";
   setKeyPlayState(Boolean(v.keyPlay));$("errorAssignmentPanel").hidden=true;$("errorAssignmentRows").innerHTML="";setField("errorDetails",v.errorDetails||"");
   $("interferencePanel").hidden=true;setField("interferencePerson","");setField("interferenceDetails","");
-  const selectedOutcome=v.outcome||outcomeId;$("droppedThirdStrikePanel").hidden=selectedOutcome!=="D3K";$("droppedThirdStrikeCause").value=v.droppedThirdStrikeCause||"unclassified";
+  const selectedOutcome=v.outcome||outcomeId;updatePlayFieldLocationVisibility(selectedOutcome,v.fieldLocation||prefill.fieldLocation||"",v.fieldingSequence||prefill.fieldingSequence||"");$("droppedThirdStrikePanel").hidden=selectedOutcome!=="D3K";$("droppedThirdStrikeCause").value=v.droppedThirdStrikeCause||"unclassified";
   if((v.fieldingErrors||[]).length||selectedOutcome==="ROE")showErrorAssignmentPanel(v.fieldingErrors||[],v.errorDetails||"");
   if(v.interferenceType||["INT","CI"].includes(selectedOutcome))showInterferencePanel(v,selectedOutcome==="CI"?"catcher":"batter");
   $("deletePlayBtn").hidden=!existing; $("playDialog").showModal();
@@ -1348,6 +1458,7 @@ function openPlayDialog(team,playerIndex,paIndex,outcomeId,existing=null){
 function handlePlayOutcomeChange(){
   const team=$("dialogTeam").value,idx=num($("dialogPlayerIndex").value),existing=scoring.plays.find(play=>play.id===$("dialogPlayId").value),outcome=$("playOutcome").value,def=defaultDetails($("playOutcome").value,team,idx,existing?.beforeState?.bases||null,existing?.beforeState?.outs??null).d;
   $("playRuns").value=def.runs;$("playRbi").value=def.rbi;$("playOuts").value=def.outs;$("batterDestination").value=def.batter;$("runner1Destination").value=def.r1;$("runner2Destination").value=def.r2;$("runner3Destination").value=def.r3;
+  updatePlayFieldLocationVisibility(outcome,existing?.fieldLocation||"",existing?.fieldingSequence||"");
   if(outcome==="ROE"&&$("errorAssignmentPanel").hidden)showErrorAssignmentPanel(existing?.fieldingErrors||[],existing?.errorDetails||"");
   if(["INT","CI"].includes(outcome)){
     showInterferencePanel(existing||{},outcome==="CI"?"catcher":"batter");
@@ -1356,7 +1467,7 @@ function handlePlayOutcomeChange(){
   $("droppedThirdStrikePanel").hidden=outcome!=="D3K";if(outcome==="D3K"&&!existing?.droppedThirdStrikeCause)$("droppedThirdStrikeCause").value="unclassified";
   $("playErrors").value=getFieldingErrorsFromDialog().length;
 }
-function recordCurrentError(){const team=currentBattingTeam(),playerIndex=num(scoring.battingIndexes[team]),paIndex=currentPaIndex(team,playerIndex);openPlayDialog(team,playerIndex,paIndex,"ROE");showErrorAssignmentPanel([],"");}
+function recordCurrentError(){const team=currentBattingTeam(),playerIndex=num(scoring.battingIndexes[team]),paIndex=currentPaIndex(team,playerIndex);openFieldLocationDialog("ROE",{mode:"dialog",team,playerIndex,paIndex,showError:true});}
 
 let runnerEventDialogBases=emptyBases();
 function runnerBaseLabel(base){return base===1?"1st":base===2?"2nd":"3rd";}
@@ -1481,7 +1592,8 @@ function changeActivePitcher(){const pitchingTeam=defensiveTeamForBattingTeam(cu
 
 function getPlayFromDialog(){
   const fieldingErrors=getFieldingErrorsFromDialog(),outcome=$("playOutcome").value,interferenceActive=!$("interferencePanel").hidden&&["INT","CI"].includes(outcome),droppedThirdStrikeCause=outcome==="D3K"?$("droppedThirdStrikeCause").value:"";
-  return {team:$("dialogTeam").value,playerIndex:num($("dialogPlayerIndex").value),paIndex:num($("dialogPaIndex").value),outcome,pitcher:getField("playPitcher"),inning:Math.max(1,num($("playInning").value)),half:$("playHalf").value,runs:Math.max(0,num($("playRuns").value)),rbi:Math.max(0,num($("playRbi").value)),outsOnPlay:Math.max(0,num($("playOuts").value)),errors:fieldingErrors.length,fieldingErrors,errorDetails:getField("errorDetails"),keyPlay:$("keyPlayBtn").getAttribute("aria-pressed")==="true",destinations:{batter:$("batterDestination").value,r1:$("runner1Destination").value,r2:$("runner2Destination").value,r3:$("runner3Destination").value},notes:getField("playNotes"),droppedThirdStrikeCause,interferenceType:interferenceActive?$("interferenceType").value:"",interferencePerson:interferenceActive?getField("interferencePerson"):"",interferenceRuling:interferenceActive?$("interferenceRuling").value:"",interferenceDetails:interferenceActive?getField("interferenceDetails"):"",countsAsPlateAppearance:interferenceActive?$("interferenceEndsPa").checked:true,abOverride:interferenceActive?$("interferenceAtBat").checked:undefined,hitOverride:interferenceActive?($("interferenceHit").checked?1:0):undefined};
+  const fieldingSequence=outcomeRequiresFieldLocation(outcome)?selectedBallPathFromForm():"",fieldLocation=normalizeFieldingSequence(fieldingSequence)[0]||"";
+  return {team:$("dialogTeam").value,playerIndex:num($("dialogPlayerIndex").value),paIndex:num($("dialogPaIndex").value),outcome,fieldLocation,fieldingSequence,pitcher:getField("playPitcher"),inning:Math.max(1,num($("playInning").value)),half:$("playHalf").value,runs:Math.max(0,num($("playRuns").value)),rbi:Math.max(0,num($("playRbi").value)),outsOnPlay:Math.max(0,num($("playOuts").value)),errors:fieldingErrors.length,fieldingErrors,errorDetails:getField("errorDetails"),keyPlay:$("keyPlayBtn").getAttribute("aria-pressed")==="true",destinations:{batter:$("batterDestination").value,r1:$("runner1Destination").value,r2:$("runner2Destination").value,r3:$("runner3Destination").value},notes:getField("playNotes"),droppedThirdStrikeCause,interferenceType:interferenceActive?$("interferenceType").value:"",interferencePerson:interferenceActive?getField("interferencePerson"):"",interferenceRuling:interferenceActive?$("interferenceRuling").value:"",interferenceDetails:interferenceActive?getField("interferenceDetails"):"",countsAsPlateAppearance:interferenceActive?$("interferenceEndsPa").checked:true,abOverride:interferenceActive?$("interferenceAtBat").checked:undefined,hitOverride:interferenceActive?($("interferenceHit").checked?1:0):undefined};
 }
 function applyDestinations(beforeBases,team,playerIndex,destinations,batterOverride=null){
   const post=emptyBases(); const batter=batterOverride||runnerFor(team,playerIndex); const runners={r1:beforeBases[1],r2:beforeBases[2],r3:beforeBases[3],batter};
@@ -1533,6 +1645,7 @@ function commitPlay(incoming,existingId=""){
 function recordPlay(event){
   event.preventDefault();
   const existingId=$("dialogPlayId").value,incoming=getPlayFromDialog();
+  if(outcomeRequiresFieldLocation(incoming.outcome)&&!normalizeFieldingSequence(incoming.fieldingSequence,incoming.fieldLocation).length){openFieldLocationDialog(incoming.outcome,{mode:"play-form"});return;}
   if(incoming.outcome==="ROE"&&!incoming.fieldingErrors.length){showErrorAssignmentPanel([],incoming.errorDetails);alert("Choose the defensive player who committed the error before saving this reached-on-error play.");return;}
   if(["INT","CI"].includes(incoming.outcome)&&!incoming.interferenceType){showInterferencePanel({},incoming.outcome==="CI"?"catcher":"batter");alert("Choose the interference type and record the umpire’s ruling before saving.");return;}
   const saved=commitPlay(incoming,existingId);if(!saved)return;
@@ -1720,8 +1833,8 @@ function computeGameTotals(){
   for(const team of ["away","home"]){const valid=scoring.plays.filter(p=>!p.afterGameEnd),stats=computeTeamStats(team);result[team].runs=sum(valid.filter(p=>p.team===team).map(p=>p.runs));result[team].hits=sum(stats.map(st=>st.h));result[team].errors=sum(valid.filter(p=>p.team!==team).map(fieldingErrorCount));valid.filter(p=>p.team===team).forEach(p=>{result[team].innings[p.inning-1]+=p.runs||0;});}
   return result;
 }
+function playFieldLocationSuffix(play){return outcomeRequiresFieldLocation(play?.outcome)?fieldingSequenceString(play?.fieldingSequence,play?.fieldLocation):"";}
 function playNotation(play){
-  if(play.outcome==="HR")return "HR";
   if(play.eventType==="runner"){
     const code=play.outcomeCode||play.outcome||"RUN",to=play.runnerEvent?.toBase,from=Math.max(1,num(play.runnerEvent?.primaryBase)||1);
     let suffix="";
@@ -1730,7 +1843,7 @@ function playNotation(play){
     if(["PK","PO"].includes(code))suffix=String(from);
     return `${code}${suffix}`;
   }
-  const errors=(play.fieldingErrors||[]).map(errorNotation).filter(Boolean),base=["INT","CI"].includes(play.outcome)?interferenceCode(play):(["KL","D3K"].includes(play.outcome)?"K":(play.outcomeCode||play.outcome||""));let text=base;
+  const errors=(play.fieldingErrors||[]).map(errorNotation).filter(Boolean),rawBase=["INT","CI"].includes(play.outcome)?interferenceCode(play):(["KL","D3K"].includes(play.outcome)?"K":(play.outcomeCode||play.outcome||"")),path=Array.isArray(play.fieldingSequence)?play.fieldingSequence:(String(play.fieldingSequence||play.fieldLocation||"").match(/[1-9]/g)||[]),locationSuffix=play.outcome==="HR"?"":path.join("-"),base=locationSuffix?`${rawBase}${locationSuffix}`:rawBase;let text=base;
   if(play.outcome==="D3K"&&play.droppedThirdStrikeCause==="wild-pitch")text=`${base} WP`;
   if(play.outcome==="D3K"&&play.droppedThirdStrikeCause==="passed-ball")text=`${base} PB`;
   if(errors.length)text=play.outcome==="ROE"?errors.join("/"):[text,...errors].filter(Boolean).join("/");
@@ -1748,7 +1861,7 @@ function renderBattingTable(team){
 function renderFielderErrorSummary(){const rows=computeFielderErrors();if(!rows.length)return '<div class="fielding-error-summary"><strong>Individual Errors</strong><p>No individual errors recorded.</p></div>';return `<div class="fielding-error-summary"><strong>Individual Errors</strong><table><thead><tr><th>Team</th><th>Fielder</th><th>E</th></tr></thead><tbody>${rows.map(row=>`<tr><td>${escapeHtml(teamName(row.team))}</td><td>${escapeHtml(formatLineupPlayer(row.player)||row.player.name)}</td><td>${row.errors}</td></tr>`).join("")}</tbody></table></div>`;}
 function renderSummary(){
   $("lineScoreSummary").innerHTML=renderLineScoreTable()+`<div class="summary-challenge-lines"><strong>Manager Replay</strong><span>${escapeHtml(managerReplaySummaryLine("away"))}</span><span>${escapeHtml(managerReplaySummaryLine("home"))}</span><strong>ABS Challenges</strong><span>${escapeHtml(challengeSummaryLine("away"))}</span><span>${escapeHtml(challengeSummaryLine("home"))}</span></div>`+renderFielderErrorSummary();$("battingSummary").innerHTML=renderBattingTable("away")+renderBattingTable("home");
-  const log=[...scoring.plays].sort((a,b)=>b.seq-a.seq);$("playLog").innerHTML=log.length?log.map(p=>{const count=p.pitchCount?`Count ${countLabel(p.pitchCount)}`:"Count not recorded",sequence=p.pitchSequence?` • Pitches: ${p.pitchSequence}`:"",details=[p.keyPlay?"KEY PLAY":"",p.notes,errorDetailsText(p),interferenceDetailsText(p)].filter(Boolean).join(" • ")||`${p.outsOnPlay} out(s), ${p.runs} run(s)`;return `<div class="play-log-item"><strong>${p.keyPlay?"★ ":""}${p.half==="top"?"Top":"Bottom"} ${p.inning} — ${escapeHtml(p.playerName)}: ${escapeHtml(playNotation(p))}</strong><p>${escapeHtml(`${count}${sequence} • ${details}`)}</p></div>`;}).join(""):`<p>No plays recorded yet.</p>`;
+  const log=[...scoring.plays].sort((a,b)=>b.seq-a.seq);$("playLog").innerHTML=log.length?log.map(p=>{const count=p.pitchCount?`Count ${countLabel(p.pitchCount)}`:"Count not recorded",sequence=p.pitchSequence?` • Pitches: ${p.pitchSequence}`:"",details=[p.keyPlay?"KEY PLAY":"",fieldingSequenceLabel(p.fieldingSequence,p.fieldLocation)?`Ball path: ${fieldingSequenceLabel(p.fieldingSequence,p.fieldLocation)}`:"",p.notes,errorDetailsText(p),interferenceDetailsText(p)].filter(Boolean).join(" • ")||`${p.outsOnPlay} out(s), ${p.runs} run(s)`;return `<div class="play-log-item"><strong>${p.keyPlay?"★ ":""}${p.half==="top"?"Top":"Bottom"} ${p.inning} — ${escapeHtml(p.playerName)}: ${escapeHtml(playNotation(p))}</strong><p>${escapeHtml(`${count}${sequence} • ${details}`)}</p></div>`;}).join(""):`<p>No plays recorded yet.</p>`;
 }
 function refreshHeadings(){ const a=teamName("away"),h=teamName("home");$("awayLineupHeading").textContent=`${a} Lineup`;$("homeLineupHeading").textContent=`${h} Lineup`;$("awayPitcherHeading").textContent=`${a} Pitchers`;$("homePitcherHeading").textContent=`${h} Pitchers`;$("awayScoringHeading").textContent=`${a} Batters`;$("homeScoringHeading").textContent=`${h} Batters`; }
 function refreshAll(){ refreshHeadings();renderScoring();renderSummary();renderPitchTracking();renderRunnerEventTracker();renderManagerReplayTracker();renderChallengeTracker();renderPitchingChangeControls(); }
@@ -1763,13 +1876,13 @@ function collectUiState(){
     scoringView:typeof scoringViewMode!=="undefined"?scoringViewMode:"plateAppearances"
   };
 }
-function applyUiState(ui={}){
+function applyUiState(ui={},options={}){
   if(ui.lookupDate)setField("lookupDate",ui.lookupDate);
   if(ui.scheduleLevel)setField("scheduleLevel",ui.scheduleLevel);
   if(typeof ui.quickResultsVisible==="boolean")setQuickResultsVisible(ui.quickResultsVisible);
   setChallengePanelVisible(Boolean(ui.challengePanelVisible));
   if(typeof setScoringView==="function")setScoringView(ui.scoringView||"plateAppearances",{persist:false});
-  if(ui.activePanel&&$(ui.activePanel))setPanel(ui.activePanel);
+  if(options.restorePanel!==false&&ui.activePanel&&$(ui.activePanel))setPanel(ui.activePanel);
 }
 function serializeApp(){ return {app:"Guariglia Baseball Scorecard Builder",version:VERSION_NUMBER,autosaveSchema:AUTOSAVE_SCHEMA_VERSION,savedAt:new Date().toISOString(),data:collectData(),scoring:deepClone(scoring),ui:collectUiState()}; }
 function autosaveStateJson(snapshot){return JSON.stringify({data:snapshot.data,scoring:snapshot.scoring,ui:snapshot.ui||{}});}
@@ -1816,11 +1929,13 @@ function scheduleAutosave(message="Current session updated"){
   updateAutosaveStatus(`${message} • Saving…`);
   autosaveTimer=setTimeout(()=>persistAutosaveNow(message),250);
 }
-function applySavedSnapshot(saved,sourceLabel="Autosave restored"){
+function applySavedSnapshot(saved,sourceLabel="Autosave restored",options={}){
   autosaveRestoring=true;
   try{
     const mirror=readRosterMirror(),recoveredData=mergeMissingGameData(saved.data,mirror?.data||{});
-    scoring=deepClone(saved.scoring);ensureScoringState();setFieldsFromData(recoveredData);applyUiState(saved.ui||{});refreshAll();
+    scoring=deepClone(saved.scoring);ensureScoringState();setFieldsFromData(recoveredData);applyUiState(saved.ui||{},{restorePanel:options.startOnSetup!==true});
+    if(options.startOnSetup===true)setPanel("setup");
+    refreshAll();
     lastAutosaveStateJson=autosaveStateJson({data:recoveredData,scoring:saved.scoring,ui:saved.ui||{}});
     updateAutosaveStatus(`${sourceLabel} • Continuous autosave active`,saved.savedAt||"");
   }finally{autosaveRestoring=false;}
@@ -1839,7 +1954,7 @@ function initializePersistentStartup(){
       const raw=localStorage.getItem(key);if(!raw)continue;
       const saved=parseSavedSnapshot(raw);
       if(key===AUTOSAVE_BACKUP_KEY||isLegacy)localStorage.setItem(AUTOSAVE_STORAGE_KEY,raw);
-      applySavedSnapshot(saved,label);if(isLegacy)persistAutosaveNow("Migrated game to Version 32",{force:true,rotate:false});return true;
+      applySavedSnapshot(saved,label,{startOnSetup:true});if(isLegacy)persistAutosaveNow("Migrated game to Version 33",{force:true,rotate:false});return true;
     }catch(err){console.warn(`${label} failed`,err);try{if(!isLegacy)localStorage.removeItem(key);}catch{}}
   }
   const mirror=readRosterMirror();
@@ -1870,7 +1985,7 @@ function clearAfterExport(){if(!confirm("Permanently clear this live game from t
 function saveGameFile(){persistAutosaveNow("Game file checkpoint",{force:true});const d=collectData(),name=safeFileName(`${d.awayTeam||"Away"}_at_${d.homeTeam||"Home"}_${d.gameDate||"game"}`);downloadBlob(new Blob([JSON.stringify(serializeApp(),null,2)],{type:"application/json"}),`${name}.scoregame.json`);$("autosaveBar").textContent="Game file downloaded. All live data remains on screen.";setTimeout(()=>showPostExportDialog("Game File"),120);}
 async function openGameFile(file){
   persistAutosaveNow("Checkpoint before opening a game file",{force:true});
-  try{const saved=JSON.parse(await file.text());if(!saved.data||!saved.scoring)throw new Error("This is not a compatible Version 11 through Version 32 game file.");scoring=deepClone(saved.scoring);ensureScoringState();setFieldsFromData(saved.data);applyUiState(saved.ui||{});refreshAll();persistAutosaveNow("Game file opened",{force:true});setPanel("scoring");}catch(err){alert(`Could not open the game file: ${err.message}`);}
+  try{const saved=JSON.parse(await file.text());if(!saved.data||!saved.scoring)throw new Error("This is not a compatible Version 11 through Version 33 game file.");scoring=deepClone(saved.scoring);ensureScoringState();setFieldsFromData(saved.data);applyUiState(saved.ui||{});refreshAll();persistAutosaveNow("Game file opened",{force:true});setPanel("scoring");}catch(err){alert(`Could not open the game file: ${err.message}`);}
 }
 function clearForManual(){
   if(!confirm("Start a blank game? This clears every current scorecard field and recorded play."))return;
@@ -2128,6 +2243,7 @@ function initEvents(){
   const autosaveFieldChange=e=>{if(e.target.matches("input,textarea,select")&&!e.target.closest("#playDialog")){rememberGameFieldValue(e.target);refreshHeadings();if(scoringViewMode==="scorecard")renderCurrentScorecardPreview();if(e.type==="change")persistAutosaveNow("Field selection saved",{force:true,rotate:false});else scheduleAutosave();}};document.addEventListener("input",autosaveFieldChange);document.addEventListener("change",autosaveFieldChange);
   document.addEventListener("blur",e=>{if(e.target?.matches?.("input,textarea,select")&&!e.target.closest("#playDialog")){rememberGameFieldValue(e.target);persistAutosaveNow("Field edit committed",{force:true,rotate:false});}},true);
   $("playForm").addEventListener("submit",recordPlay);$("closePlayDialogBtn").addEventListener("click",()=>$("playDialog").close());$("cancelPlayBtn").addEventListener("click",()=>$("playDialog").close());$("playOutcome").addEventListener("change",handlePlayOutcomeChange);
+  $("fieldLocationGrid").addEventListener("click",event=>{const button=event.target.closest("[data-field-position]");if(button)applyFieldLocationSelection(button.dataset.fieldPosition);});$("closeFieldLocationDialogBtn").addEventListener("click",closeFieldLocationDialog);$("cancelFieldLocationBtn").addEventListener("click",closeFieldLocationDialog);$("undoFieldingSequenceBtn").addEventListener("click",undoFieldingSequence);$("clearFieldingSequenceBtn").addEventListener("click",clearFieldingSequence);$("useFieldingSequenceBtn").addEventListener("click",completeFieldingSequence);$("chooseFieldLocationBtn").addEventListener("click",()=>openFieldLocationDialog($("playOutcome").value,{mode:"play-form",selected:$("playFieldLocation").value,sequence:$("playFieldingSequence").value}));
   $("runnerEventBtn").addEventListener("click",()=>openRunnerEventDialog());$("runnerEventForm").addEventListener("submit",saveRunnerEvent);$("closeRunnerEventDialogBtn").addEventListener("click",()=>$("runnerEventDialog").close());$("cancelRunnerEventBtn").addEventListener("click",()=>$("runnerEventDialog").close());
   $("runnerEventType").addEventListener("change",()=>{populateRunnerEventResults($("runnerEventType").value);applyRunnerEventDefaults();});$("runnerEventResult").addEventListener("change",()=>applyRunnerEventDefaults());$("runnerEventPrimaryBase").addEventListener("change",()=>applyRunnerEventDefaults());
   [1,2,3].forEach(base=>$(`runnerEventRunner${base}Destination`).addEventListener("change",syncRunnerEventCounts));
@@ -2180,6 +2296,6 @@ function init(){
   window.addEventListener("beforeunload",()=>persistAutosaveNow("Saved before closing",{force:true}));
   document.addEventListener("freeze",()=>persistAutosaveNow("Saved before mobile suspension",{force:true}));
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")persistAutosaveNow("Saved while app moved to background",{force:true});else stabilizeRestoredGameFields("Game fields restored from background");});
-  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=32-excel-count-text",{updateViaCache:"none"}).catch(console.warn);
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("service-worker.js?v=33-follow-ball-r2",{updateViaCache:"none"}).catch(console.warn);
 }
 init();

@@ -7,16 +7,17 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Guariglia Scorecard" />
-  <title>Guariglia Baseball Scorecard Builder - Version 32</title>
+  <title>Guariglia Baseball Scorecard Builder - Version 33</title>
+  <!-- Version 33 supersedes the tested Version 32 production baseline. -->
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=32-excel-count-text" />
+  <link rel="stylesheet" href="styles.css?v=33-follow-ball-r2" />
 </head>
 <body>
   <header class="hero no-print">
     <div class="hero-brand">
       <div class="brand-mark-wrap"><img class="brand-mark" src="assets/guariglia-crest.gif" alt="Guariglia crest" /></div>
       <div class="hero-copy">
-        <p class="eyebrow">Guariglia company app • Version 32</p>
+        <p class="eyebrow">Guariglia company app • Version 33</p>
         <h1>Baseball Scorecard Builder & Live Scorer</h1>
         <p class="subtitle">Build the scorecard, score every plate appearance from a phone or desktop, and export the finished game.</p>
       </div>
@@ -386,6 +387,21 @@
     </section>
   </main>
 
+  <dialog id="fieldLocationDialog" class="play-dialog field-location-dialog no-print" aria-labelledby="fieldLocationTitle">
+    <form method="dialog" id="fieldLocationForm">
+      <div class="dialog-header"><div><p class="section-kicker">Batted-ball location</p><h2 id="fieldLocationTitle">Where was the ball hit?</h2></div><button id="closeFieldLocationDialogBtn" class="icon-button" value="cancel" type="button" aria-label="Close">×</button></div>
+      <p id="fieldLocationPrompt" class="field-location-prompt">Tap each defensive player in the order the ball traveled.</p>
+      <div id="fieldLocationGrid" class="field-location-grid" role="group" aria-label="Defensive positions one through nine"></div>
+      <section class="fielding-sequence-panel" aria-labelledby="fieldingSequenceHeading">
+        <div class="fielding-sequence-heading"><strong id="fieldingSequenceHeading">Ball path</strong><span>Example: 6 → 3</span></div>
+        <div id="fieldingSequenceTray" class="fielding-sequence-tray" role="status" aria-live="polite"></div>
+        <div class="fielding-sequence-actions"><button id="undoFieldingSequenceBtn" class="secondary compact" type="button">Undo Last</button><button id="clearFieldingSequenceBtn" class="secondary compact" type="button">Clear</button><button id="useFieldingSequenceBtn" class="primary" type="button" disabled>Use Ball Path</button></div>
+      </section>
+      <p class="small-note field-location-note">Official defensive numbers: 1 P, 2 C, 3 1B, 4 2B, 5 3B, 6 SS, 7 LF, 8 CF, 9 RF. Repeated fielders are allowed, such as 3–6–3.</p>
+      <div class="dialog-actions"><span class="spacer"></span><button id="cancelFieldLocationBtn" class="secondary" value="cancel" type="button">Cancel</button></div>
+    </form>
+  </dialog>
+
   <dialog id="playDialog" class="play-dialog no-print">
     <form method="dialog" id="playForm">
       <div class="dialog-header"><div><p class="section-kicker">Plate appearance details</p><h2 id="dialogTitle">Record Play</h2></div><button id="closePlayDialogBtn" class="icon-button" value="cancel" type="button" aria-label="Close">×</button></div>
@@ -400,6 +416,12 @@
         <label>Outs on play<input id="playOuts" type="number" min="0" max="3" value="0" /></label>
         <label>Errors charged<input id="playErrors" type="number" min="0" max="3" value="0" readonly /></label>
       </div>
+      <section id="playFieldLocationSection" class="play-field-location-section" hidden>
+        <input id="playFieldingSequence" type="hidden" value="" />
+        <select id="playFieldLocation" class="legacy-field-location-select" tabindex="-1" aria-hidden="true"><option value="">Choose position 1–9</option></select>
+        <label>Ball path / fielding sequence<input id="playFieldingSequenceDisplay" type="text" value="No ball path selected" readonly /></label>
+        <button id="chooseFieldLocationBtn" class="secondary compact" type="button">Follow Ball on Field</button>
+      </section>
       <h3>Where everyone finished</h3>
       <div class="runner-grid">
         <label>Batter<select id="batterDestination"></select></label>
@@ -567,8 +589,8 @@
 
   <script src="vendor/jszip.min.js"></script>
   <script src="template_data.js"></script>
-  <script src="pdf_background_data.js?v=32"></script>
-  <script src="baseball-data.js?v=32"></script>
-  <script src="app.js?v=32-excel-count-text"></script>
+  <script src="pdf_background_data.js?v=33"></script>
+  <script src="baseball-data.js?v=33"></script>
+  <script src="app.js?v=33-follow-ball-r2"></script>
 </body>
 </html>

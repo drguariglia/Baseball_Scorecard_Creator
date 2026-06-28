@@ -1,17 +1,17 @@
-const CACHE = "guariglia-scorecard-v32-excel-count-text";
+const CACHE = "guariglia-scorecard-v33-follow-ball-r2";
 const CORE_ASSETS = [
-  "/styles.css?v=32-excel-count-text",
-  "/app.js?v=32-excel-count-text",
-  "/baseball-data.js?v=32",
+  "/styles.css?v=33-follow-ball-r2",
+  "/app.js?v=33-follow-ball-r2",
+  "/baseball-data.js?v=33",
   "/template_data.js",
-  "/pdf_background_data.js?v=32",
+  "/pdf_background_data.js?v=33",
   "/vendor/jszip.min.js",
   "/assets/guariglia-crest.gif",
   "/assets/icon-192.png",
   "/assets/icon-512.png",
   "/assets/Scorecard_20260615_blank_template.xlsx",
   "/assets/Scorecard_20260615_App_Colors_Classic_Blank.xlsx",
-  "/assets/classic-scorecard-background.jpg?v=32-excel-count-text",
+  "/assets/classic-scorecard-background.jpg?v=33-follow-ball-r2",
   "/manifest.webmanifest"
 ];
 

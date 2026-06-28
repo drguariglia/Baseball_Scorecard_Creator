@@ -1,8 +1,48 @@
 # Guariglia Baseball Scorecard Builder
 
+## Version 33.0.2 — Follow-the-Ball Scoring
+
+- Home runs save immediately without opening the field map.
+- The baseball-field popup now records the complete defensive ball path in order, including repeated fielders.
+- Examples: `GO6-3`, `DP6-4-3`, `DP4-3-1`, and `DP3-6-3`.
+- The selected path is retained in autosave, game files, play editing, play logs, scorecard notation, Excel, PDF, and undo/rebuild workflows.
+- Existing Version 33 plays containing only one field location remain compatible and are treated as one-step ball paths.
+
+## Version 33.0.2 — Setup-First Launch and Verified Game Emulation
+
+- Every app launch now opens **Step 1 — Setup**, including launches that recover an existing autosaved game.
+- Restored teams, lineups, pitchers, pitches, plays, score, inning state, notes, and other game data remain intact and can be resumed from Live Scoring.
+- Home runs now record immediately as `HR` without opening the field-location or ball-path dialog.
+- Keeps the Current Scorecard line score inside its internal horizontal scroller on iPhone instead of widening the page.
+- Passed all **51 automated regression test files** and complete game emulation on iPhone, iPad, and desktop.
+
+## Version 33 — Visual Baseball-Field Location Selector
+
+Version 33 preserves the complete Version 32 scoring, autosave, saved-game, undo, Excel, and PDF workflows while redesigning the batted-ball location popup as an interactive baseball field.
+
+### Version 33 changes
+
+- Replaces the former position grid with a true baseball-field diagram showing grass, dirt, foul lines, bases, the mound, and home plate.
+- Places all nine standard defensive position buttons in their normal field alignment: **1 P, 2 C, 3 1B, 4 2B, 5 3B, 6 SS, 7 LF, 8 CF, 9 RF**.
+- Keeps every field-location button finger-sized and clearly labeled with its number, abbreviation, and position name.
+- Retains the selected position in autosave, saved game files, play editing, undo reconstruction, scorecard notation, the play log, Excel, and PDF exports.
+- Uses a new Version 33 service-worker cache so installed phones and tablets receive the redesigned popup.
+- Migrates the current Version 32 browser autosave into Version 33 when available.
+- Passed all **49 automated regression test files**, JavaScript syntax validation, **11 iPhone/iPad viewport checks**, and end-to-end phone and tablet selection/save flows.
+
 ## Version 32 — Manager Replay, ABS, and Complete PDF Pitching Lines
 
 Version 32 preserves the complete Version 31 live-scorecard workflow and adds a dedicated **Manager Replay** tracker that is independent from the existing **ABS ball-strike challenge** tracker.
+
+### Version 32 Batted-Ball Field Location Update
+
+- Every quick-result button for a ball put in play now opens a compact defensive-position selector before the play is committed.
+- Uses standard baseball numbering: **1 P, 2 C, 3 1B, 4 2B, 5 3B, 6 SS, 7 LF, 8 CF, 9 RF**.
+- Applies to hits, reached-on-error, fielder's choice, groundouts, airborne outs, sacrifices, double plays, and triple plays.
+- Saves the location in continuous autosave and saved games and includes it in the play log, scorecard notation, Excel, and PDF output.
+- Adds mobile-safe 44-pixel position buttons, dynamic-viewport containment, a compact phone-landscape layout, and no-horizontal-overflow checks.
+- All 47 regression files, JavaScript syntax validation, 11 iPhone/iPad viewport checks, and two end-to-end mobile save-flow checks passed.
+- This maintenance update remains **Version 32**.
 
 
 ### Version 32 Mobile Application Audit
@@ -138,7 +178,7 @@ Version 32 preserves the complete Version 31 live-scorecard workflow and adds a 
 - Excel, PDF, saved-game, and pitch-log CSV exports
 - Optional traditional guides on blank PDFs
 
-Version 32 is the current approved production and controlling baseline.
+Version 33 is the current production and controlling baseline.
 
 
 

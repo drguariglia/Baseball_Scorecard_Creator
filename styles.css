@@ -926,3 +926,160 @@ html,body{overflow-x:clip}
     min-height:44px;
   }
 }
+
+
+/* Version 33 visual baseball-field location selector */
+.field-location-dialog{width:min(620px,calc(100vw - 1rem))}
+.field-location-dialog form{overscroll-behavior:contain}
+.field-location-prompt{margin:.1rem 0 .7rem;color:var(--muted);line-height:1.4;text-align:center;font-weight:750}
+.field-location-grid{
+  position:relative;
+  width:min(100%,540px);
+  aspect-ratio:6/5;
+  min-height:250px;
+  margin:0 auto;
+  overflow:hidden;
+  border-radius:30px;
+  background:linear-gradient(180deg,#5f9e43,#3f7f35);
+  box-shadow:0 14px 30px rgba(61,37,25,.20),inset 0 0 0 1px rgba(255,255,255,.22);
+  isolation:isolate;
+}
+.field-map-art{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.field-location-button{
+  position:absolute;
+  z-index:2;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:clamp(54px,15.5%,82px);
+  min-width:54px;
+  min-height:54px;
+  aspect-ratio:1/1;
+  padding:.28rem .18rem;
+  border:3px solid #fff8e9;
+  border-radius:50%;
+  display:grid;
+  grid-template-columns:auto auto;
+  grid-template-areas:"number code" "label label";
+  place-content:center;
+  align-items:center;
+  column-gap:.16rem;
+  row-gap:.05rem;
+  background:linear-gradient(180deg,#4c2b1b,#2f1c14);
+  color:#fff8e9;
+  box-shadow:0 5px 0 rgba(61,37,25,.34),0 9px 18px rgba(34,23,15,.28);
+  text-align:center;
+  touch-action:manipulation;
+}
+.field-location-button strong{grid-area:number;font-size:1.38rem;line-height:1;font-weight:950;color:#f7d77e}
+.field-location-button span{grid-area:code;font-size:.78rem;font-weight:950;line-height:1;color:#fff8e9}
+.field-location-button small{grid-area:label;font-size:.54rem;line-height:1.05;color:#f5dfba;font-weight:850;white-space:nowrap}
+.field-location-button:hover,.field-location-button:focus-visible{
+  background:linear-gradient(180deg,#9b4d1f,#6f3519);
+  border-color:#f7d77e;
+  outline:3px solid rgba(255,255,255,.9);
+  outline-offset:2px;
+  transform:translate(-50%,-50%) scale(1.06);
+}
+.field-location-button:active{transform:translate(-50%,-47%) scale(.98);box-shadow:0 2px 0 rgba(61,37,25,.4),0 5px 10px rgba(34,23,15,.22)}
+/* Standard defensive alignment: 1 P, 2 C, 3 1B, 4 2B, 5 3B, 6 SS, 7 LF, 8 CF, 9 RF */
+.field-pos-1{left:50%;top:63%}
+.field-pos-2{left:50%;top:87%}
+.field-pos-3{left:76%;top:68%}
+.field-pos-4{left:63%;top:50%}
+.field-pos-5{left:24%;top:68%}
+.field-pos-6{left:37%;top:50%}
+.field-pos-7{left:19%;top:29%}
+.field-pos-8{left:50%;top:17%}
+.field-pos-9{left:81%;top:29%}
+.field-location-note{margin:.65rem auto 0;max-width:540px;text-align:center}
+.play-field-location-section{margin:.75rem 0;padding:.72rem;border:1px solid #d8bd87;border-radius:12px;background:#fff7dc;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.65rem;align-items:end}
+.play-field-location-section[hidden]{display:none!important}
+.play-field-location-section label{margin:0}
+.play-field-location-section button{min-height:44px}
+@media(max-width:760px){
+  .field-location-dialog{width:calc(100vw - .75rem)}
+  .field-location-grid{width:min(100%,500px);min-height:235px;border-radius:24px}
+  .play-field-location-section{grid-template-columns:1fr}
+  .play-field-location-section button{width:100%}
+}
+@media(max-width:430px){
+  .field-location-dialog form{padding:.72rem}
+  .field-location-grid{width:100%;min-height:224px;border-radius:21px}
+  .field-location-button{width:clamp(48px,16.5%,62px);min-width:48px;min-height:48px;border-width:2px;padding:.18rem .12rem}
+  .field-location-button strong{font-size:1.08rem}
+  .field-location-button span{font-size:.66rem}
+  .field-location-button small{font-size:.44rem}
+  .field-location-note{font-size:.67rem;line-height:1.2}
+}
+@media(pointer:coarse){
+  .field-location-button{min-width:44px;min-height:44px}
+}
+/* Compact field map for iPhone SE and other short portrait screens */
+@media(max-width:360px), (max-height:650px) and (max-width:500px){
+  .field-location-dialog form{padding:.58rem}
+  .field-location-dialog .dialog-header{margin-bottom:.46rem;padding-bottom:.4rem}
+  .field-location-dialog .dialog-header h2{font-size:1.1rem}
+  .field-location-prompt{margin:0 0 .38rem;font-size:.75rem;line-height:1.22}
+  .field-location-grid{min-height:205px;border-radius:18px}
+  .field-location-button{width:46px;min-width:46px;min-height:46px}
+  .field-location-button strong{font-size:.98rem}
+  .field-location-button span{font-size:.6rem}
+  .field-location-button small{font-size:.4rem}
+  .field-location-note{margin:.42rem 0 0;font-size:.59rem}
+  .field-location-dialog .dialog-actions{margin-top:.4rem;padding-top:.4rem}
+}
+/* Keep the field fully usable on iPhone landscape without horizontal overflow. */
+@media(max-height:500px) and (min-width:600px){
+  .field-location-dialog{width:min(760px,calc(100vw - .75rem))}
+  .field-location-dialog form{padding:.5rem}
+  .field-location-dialog .dialog-header{margin-bottom:.34rem;padding-bottom:.3rem}
+  .field-location-dialog .dialog-header h2{font-size:1rem}
+  .field-location-dialog .section-kicker{display:none}
+  .field-location-prompt{margin:0 0 .3rem;font-size:.7rem;line-height:1.15}
+  .field-location-grid{width:min(340px,60vw);min-height:0;aspect-ratio:6/4.65;border-radius:17px}
+  .field-location-button{width:48px;min-width:48px;min-height:48px;border-width:2px}
+  .field-location-button strong{font-size:1rem}
+  .field-location-button span{font-size:.62rem}
+  .field-location-button small{font-size:.4rem}
+  .field-location-note{display:none}
+  .field-location-dialog .dialog-actions{display:none}
+}
+
+
+/* Version 33.0.2 official-scoring ball-path recorder */
+.fielding-sequence-panel{width:min(100%,540px);margin:.68rem auto 0;padding:.65rem;border:1px solid #d8bd87;border-radius:14px;background:#fff9e8}
+.fielding-sequence-heading{display:flex;align-items:center;justify-content:space-between;gap:.5rem;color:var(--brown)}
+.fielding-sequence-heading span{font-size:.75rem;color:var(--muted);font-weight:800}
+.fielding-sequence-tray{min-height:54px;margin:.48rem 0;display:flex;align-items:center;justify-content:center;gap:.3rem;flex-wrap:wrap;padding:.38rem;border:1px dashed #b78d50;border-radius:11px;background:#fff}
+.fielding-sequence-empty{font-size:.78rem;color:var(--muted);font-weight:750;text-align:center}
+.fielding-sequence-step{display:grid;grid-template-columns:auto auto;grid-template-areas:"order number" "order code";align-items:center;column-gap:.25rem;min-width:48px;padding:.25rem .38rem;border-radius:10px;background:#4c2b1b;color:#fff8e9;box-shadow:0 2px 5px rgba(61,37,25,.2)}
+.fielding-sequence-step b{grid-area:order;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#f7d77e;color:#3d2519;font-size:.64rem}
+.fielding-sequence-step strong{grid-area:number;font-size:1.05rem;line-height:1;color:#f7d77e}
+.fielding-sequence-step small{grid-area:code;font-size:.58rem;font-weight:900;line-height:1}
+.fielding-sequence-arrow{font-weight:950;color:#8e5a28}
+.fielding-sequence-actions{display:grid;grid-template-columns:auto auto minmax(130px,1fr);gap:.45rem}
+.fielding-sequence-actions button{min-height:44px}
+.field-location-button.is-in-path{border-color:#f7d77e;box-shadow:0 0 0 4px rgba(247,215,126,.45),0 5px 0 rgba(61,37,25,.34),0 9px 18px rgba(34,23,15,.28)}
+.field-location-button[data-path-count]:not([data-path-count=""])::after{content:attr(data-path-count);position:absolute;right:-4px;top:-5px;display:grid;place-items:center;width:21px;height:21px;border-radius:50%;background:#fff8e9;color:#3d2519;border:2px solid #8e5a28;font-size:.68rem;font-weight:950}
+.legacy-field-location-select{position:absolute!important;width:1px!important;height:1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important}
+#playFieldingSequenceDisplay{font-weight:900;letter-spacing:.04em;background:#fffdf7}
+@media(max-width:430px){
+  .fielding-sequence-panel{margin-top:.45rem;padding:.45rem}
+  .fielding-sequence-tray{min-height:46px;margin:.35rem 0;padding:.28rem}
+  .fielding-sequence-actions{grid-template-columns:1fr 1fr}
+  .fielding-sequence-actions #useFieldingSequenceBtn{grid-column:1/-1}
+}
+@media(max-height:500px) and (min-width:600px){
+  .fielding-sequence-panel{position:absolute;right:.5rem;top:3.1rem;width:min(330px,43vw);margin:0;padding:.42rem}
+  .field-location-grid{margin-right:calc(min(330px,43vw) + .65rem);margin-left:.2rem}
+  .fielding-sequence-heading span,.field-location-note{display:none}
+  .fielding-sequence-tray{min-height:42px;margin:.3rem 0;padding:.22rem}
+  .fielding-sequence-actions{grid-template-columns:1fr 1fr}
+  .fielding-sequence-actions #useFieldingSequenceBtn{grid-column:1/-1}
+}
+
+.field-ball-path{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible}
+.field-ball-path polyline{fill:none;stroke:#fff3a6;stroke-width:1.15;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 1px 1px rgba(61,37,25,.75));stroke-dasharray:2.2 1.2}
+.field-ball-path-stop{fill:#fff8e9;stroke:#6f3519;stroke-width:.65}
+.field-ball-current{fill:#f7d77e;stroke:#4c2b1b;stroke-width:.8;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45))}
